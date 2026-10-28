@@ -221,11 +221,18 @@
 
     <script>
       const storageKey = "tickets_v4";
+      const reminderInterval = 24 * 60 * 60 * 1000;
       let activeCategory = "All";
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
           if (cleanedTicket.status === "Open") cleanedTicket.status = "Assigned";
+          if (
+            needsStatusReminder(cleanedTicket.status) &&
+            Number.isNaN(Date.parse(cleanedTicket.nextStatusReminderAt))
+          ) {
+            cleanedTicket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
+          }
           return cleanedTicket;
         });
 
@@ -242,6 +249,10 @@
       }
 
       save();
+
+      function needsStatusReminder(status) {
+        return status === "Assigned" || status === "In Progress";
+      }
 
       function pop(message) {
         const notification = document.getElementById("n");
@@ -288,9 +299,16 @@
           lastUpdate: new Date().toLocaleString(),
           notes: [],
         };
+        if (needsStatusReminder(ticket.status)) {
+          ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
+        }
 
         tickets.push(ticket);
         save();
+        ["tn", "cn", "tf", "sd", "ad"].forEach((id) => {
+          document.getElementById(id).value = "";
+        });
+        document.getElementById("st").value = "Assigned";
         render();
         pop("Ticket Created");
       }
@@ -317,8 +335,41 @@
         if (tickets[index].status === status) return;
         tickets[index].status = status;
         tickets[index].lastUpdate = new Date().toLocaleString();
+        if (needsStatusReminder(status)) {
+          tickets[index].nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
+        } else {
+          delete tickets[index].nextStatusReminderAt;
+        }
         save();
         render();
+      }
+
+      function checkStatusReminders() {
+        const now = Date.now();
+        const dueTickets = [];
+
+        tickets.forEach((ticket) => {
+          if (!needsStatusReminder(ticket.status)) return;
+
+          let nextReminder = Date.parse(ticket.nextStatusReminderAt);
+          if (Number.isNaN(nextReminder)) {
+            nextReminder = now + reminderInterval;
+          } else if (nextReminder <= now) {
+            dueTickets.push(ticket.ticketNumber);
+            do {
+              nextReminder += reminderInterval;
+            } while (nextReminder <= now);
+          } else {
+            return;
+          }
+
+          ticket.nextStatusReminderAt = new Date(nextReminder).toISOString();
+        });
+
+        if (dueTickets.length) {
+          save();
+          pop(`Reminder: ${dueTickets.join(", ")} ${dueTickets.length === 1 ? "is" : "are"} still Assigned or In Progress`);
+        }
       }
 
       function setCategoryFilter(category) {
@@ -423,6 +474,8 @@
           tickets.filter((ticket) => ticket.status === "Closed").length;
       }
 
+      checkStatusReminders();
+      setInterval(checkStatusReminders, 60 * 1000);
       render();
     </script>
   </body>

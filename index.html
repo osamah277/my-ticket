@@ -67,6 +67,15 @@
         background: #4a90e2;
       }
 
+      .delete-btn {
+        padding: 6px 10px;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        background: #c0392b;
+        cursor: pointer;
+      }
+
       .table {
         width: 100%;
         border-collapse: collapse;
@@ -174,6 +183,7 @@
           <th>Customer</th>
           <th>Status</th>
           <th>Description</th>
+          <th>Actions</th>
         </tr>
       </thead>
       <tbody id="list"></tbody>
@@ -277,6 +287,17 @@
         render();
       }
 
+      function deleteTicket(index) {
+        const ticket = tickets[index];
+        if (!ticket) return;
+        if (!confirm(`Delete ticket ${ticket.ticketNumber}? This cannot be undone.`)) return;
+
+        tickets.splice(index, 1);
+        save();
+        render();
+        pop("Ticket Deleted");
+      }
+
       function render() {
         const searchTerm = document.getElementById("search").value.toLowerCase();
         const filter = document.getElementById("filter").value;
@@ -302,9 +323,14 @@
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>
               <td>${ticket.shortDescription}</td>
+              <td>
+                <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">
+                  Delete
+                </button>
+              </td>
             </tr>
             <tr>
-              <td colspan="4">
+              <td colspan="5">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>

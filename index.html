@@ -1,321 +1,48 @@
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Ticket Dashboard V5</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <style>
-      body {
-        font-family: Segoe UI, Arial;
-        background: #FFF8E7;
-        margin: 20px;
-        color: #5B4636;
-      }
-
-      h1 {
-        color: #A66A00;
-      }
-
-      .card,
-      .stat {
-        background: #FFFDF7;
-        border: 1px solid #E8D9B5;
-        border-radius: 10px;
-        padding: 12px;
-      }
-
-      .stats {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 10px;
-      }
-
-      .toolbar {
-        display: flex;
-        gap: 10px;
-        margin: 10px 0;
-      }
-
-      .btn {
-        background: #D4A437;
-        color: white;
-        border: none;
-        padding: 10px;
-        border-radius: 8px;
-        cursor: pointer;
-      }
-
-      input,
-      textarea,
-      select {
-        width: 100%;
-        padding: 8px;
-        margin: 5px 0;
-        border: 1px solid #E8D9B5;
-        border-radius: 6px;
-      }
-
-      .table {
-        width: 100%;
-        border-collapse: collapse;
-        background: white;
-      }
-
-      .table th {
-        background: #F4E3B2;
-      }
-
-      .table th,
-      .table td {
-        padding: 10px;
-        border: 1px solid #E8D9B5;
-      }
-
-      .detail {
-        display: none;
-        background: #FFFDF7;
-        padding: 10px;
-      }
-
-      .note {
-        background: #FAF0D7;
-        padding: 6px;
-        margin: 4px 0;
-      }
-
-      .reminderModal {
-        position: fixed;
-        inset: 0;
-        background: rgba(0, 0, 0, 0.4);
-        display: none;
-        align-items: center;
-        justify-content: center;
-      }
-
-      .box {
-        background: white;
-        padding: 20px;
-        border-radius: 12px;
-        width: 420px;
-      }
-    </style>
-  </head>
-  <body>
-    <div id="rm" class="reminderModal">
-      <div class="box">
-        <h3>🔔 Reminder</h3>
-        <div id="rmText"></div>
-        <br />
-        <button class="btn" onclick="ackReminder()">OK</button>
-      </div>
-    </div>
-
-    <h1>🍯 Ticket Dashboard V5</h1>
-
-    <div class="stats">
-      <div class="stat">Total <span id="t">0</span></div>
-      <div class="stat">Open <span id="o">0</span></div>
-      <div class="stat">Progress <span id="i">0</span></div>
-      <div class="stat">Pending <span id="p">0</span></div>
-      <div class="stat">Closed <span id="c">0</span></div>
-    </div>
-
-    <br />
-
-    <div class="card">
-      <h3>Create Ticket</h3>
-      <input id="cn" placeholder="Customer Name" />
-      <input id="tf" placeholder="Ticket From" />
-      <input id="sd" placeholder="Short Description" />
-      <textarea id="td" placeholder="Ticket Detail"></textarea>
-      <input type="date" id="ad" />
-      <select id="st">
-        <option>Open</option>
-        <option>Assigned</option>
-        <option>In Progress</option>
-        <option>Pending Customer</option>
-        <option>Pending Vendor</option>
-        <option>Resolved</option>
-        <option>Closed</option>
-      </select>
-      <input type="datetime-local" id="rd" />
-      <input id="rn" placeholder="Reminder Note" />
-      <button class="btn" onclick="createTicket()">Create Ticket</button>
-    </div>
-
-    <div class="toolbar">
-      <input id="search" placeholder="Search Ticket #" onkeyup="render()" />
-      <input type="file" id="excel" accept=".xlsx" />
-      <button class="btn" onclick="importExcel()">Import Excel</button>
-      <button class="btn" onclick="exportExcel()">Export Excel</button>
-      <button class="btn" onclick="autoBackup()">Auto Backup Now</button>
-    </div>
-
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Ticket #</th>
-          <th>Customer</th>
-          <th>Status</th>
-          <th>Description</th>
-        </tr>
-      </thead>
-      <tbody id="list"></tbody>
-    </table>
-
-    <script>
-      let tickets = JSON.parse(localStorage.getItem('tickets_v5') || '[]');
-      let activeReminder = null;
-
-      function save() {
-        localStorage.setItem('tickets_v5', JSON.stringify(tickets));
-      }
-
-      function nextId() {
-        return 'INC' + String(tickets.length + 1).padStart(6, '0');
-      }
-
-      function createTicket() {
-        tickets.push({
-          ticketNumber: nextId(),
-          customerName: cn.value,
-          ticketFrom: tf.value,
-          shortDescription: sd.value,
-          ticketDetail: td.value,
-          assignedDate: ad.value,
-          status: st.value,
-          reminderDate: rd.value,
-          reminderNote: rn.value,
-          reminderDone: false,
-          attachments: [],
-          notes: []
-        });
-
-        save();
-        render();
-      }
-
-      function toggle(i) {
-        let d = document.getElementById('d' + i);
-        d.style.display = d.style.display === 'block' ? 'none' : 'block';
-      }
-
-      function addNote(i) {
-        let v = document.getElementById('note' + i).value;
-
-        if (!v) return;
-
-        tickets[i].notes.push({
-          date: new Date().toLocaleString(),
-          text: v
-        });
-
-        save();
-        render();
-      }
-
-      function addAttachment(i, e) {
-        let f = e.files[0];
-
-        if (!f) return;
-
-        tickets[i].attachments.push({ name: f.name });
-        save();
-        render();
-      }
-
-      function render() {
-        let s = (search.value || '').toLowerCase();
-        list.innerHTML = '';
-
-        tickets
-          .filter(x => x.ticketNumber.toLowerCase().includes(s))
-          .forEach((x, i) => {
-            list.innerHTML += `
-              <tr onclick="toggle(${i})">
-                <td>${x.ticketNumber}</td>
-                <td>${x.customerName}</td>
-                <td>${x.status}</td>
-                <td>${x.shortDescription}</td>
-              </tr>
-              <tr>
-                <td colspan="4">
-                  <div class="detail" id="d${i}">
-                    <b>Detail:</b> ${x.ticketDetail}<br>
-                    <b>Reminder:</b> ${x.reminderDate || ''} ${x.reminderNote || ''}<br>
-                    <input type="file" accept=".pdf,.png,.jpg,.jpeg" onchange="addAttachment(${i}, this)" />
-                    <div>${x.attachments.map(a => '📎 ' + a.name).join('<br>')}</div>
-                    <textarea id="note${i}" placeholder="Add note"></textarea>
-                    <button class="btn" onclick="event.stopPropagation(); addNote(${i})">Save Note</button>
-                    ${x.notes.map(n => '<div class="note">' + n.date + '<br>' + n.text + '</div>').join('')}
-                  </div>
-                </td>
-              </tr>
-            `;
-          });
-
-        t.innerText = tickets.length;
-        o.innerText = tickets.filter(x => x.status !== 'Closed').length;
-        i.innerText = tickets.filter(x => x.status === 'In Progress').length;
-        p.innerText = tickets.filter(x => x.status.includes('Pending')).length;
-        c.innerText = tickets.filter(x => x.status === 'Closed').length;
-      }
-
-      function exportExcel() {
-        let ws = XLSX.utils.json_to_sheet(tickets);
-        let wb = XLSX.utils.book_new();
-        XLSX.utils.book_append_sheet(wb, ws, 'Tickets');
-        XLSX.writeFile(wb, 'Tickets_Backup.xlsx');
-      }
-
-      function importExcel() {
-        let f = excel.files[0];
-
-        if (!f) return;
-
-        let r = new FileReader();
-
-        r.onload = e => {
-          let wb = XLSX.read(e.target.result, { type: 'array' });
-          tickets = XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
-          save();
-          render();
-        };
-
-        r.readAsArrayBuffer(f);
-      }
-
-      function autoBackup() {
-        exportExcel();
-      }
-
-      setInterval(autoBackup, 300000);
-
-      function checkReminders() {
-        let now = new Date();
-
-        tickets.forEach((r, k) => {
-          if (r.reminderDate && !r.reminderDone && new Date(r.reminderDate) <= now && activeReminder === null) {
-            activeReminder = k;
-            rmText.innerHTML = '<b>' + r.ticketNumber + '</b><br>' + r.reminderNote;
-            rm.style.display = 'flex';
-          }
-        });
-      }
-
-      function ackReminder() {
-        if (activeReminder !== null) {
-          tickets[activeReminder].reminderDone = true;
-          save();
-        }
-
-        rm.style.display = 'none';
-        activeReminder = null;
-      }
-
-      setInterval(checkReminders, 30000);
-      render();
-    </script>
-  </body>
-</html>
+<!DOCTYPE html><html><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>
+<title>Ticket Dashboard V6</title>
+<script src='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'></script>
+<style>
+body{font-family:Segoe UI;background:#FFF8E7;margin:20px;color:#5b4636}
+.card,.stat{background:#FFFCF3;border:1px solid #E2C878;border-radius:12px;padding:15px}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:15px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+input,textarea,select{width:100%;padding:10px;border:1px solid #E2C878;border-radius:8px;box-sizing:border-box;margin-top:5px}
+button{background:#C98A00;color:#fff;border:none;padding:10px 14px;border-radius:8px;cursor:pointer}
+.table{width:100%;border-collapse:collapse;background:white}.table th,.table td{padding:10px;border:1px solid #E2C878}.table th{background:#F6E7B0}
+.detail{display:none;padding:12px;background:#FFFCF3}.badge{padding:4px 8px;border-radius:12px;color:#fff}.open{background:#1976d2}.assigned{background:#7b1fa2}.progress{background:#f9a825}.pending{background:#ef6c00}.resolved{background:#2e7d32}.closed{background:#616161}
+#admin,#reminderModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4)} .panel{background:white;width:420px;margin:80px auto;padding:20px;border-radius:12px}
+</style></head><body>
+<h1>🍯 Ticket Dashboard V6</h1>
+<div class='grid'><div class='stat'>Total <span id='total'>0</span></div><div class='stat'>Open <span id='openCount'>0</span></div><div class='stat'>Pending <span id='pendingCount'>0</span></div><div class='stat'>Closed <span id='closedCount'>0</span></div><div class='stat'>🔔 <span id='remCount'>0</span></div></div>
+<div class='card'>
+<h3>Create Ticket</h3>
+<div class='row'><input id='customer' placeholder='Customer Name'><input id='from' placeholder='Ticket From'></div>
+<input id='short' placeholder='Short Description'>
+<textarea id='detail' placeholder='Ticket Detail'></textarea>
+<div class='row'><select id='status'><option>Open</option><option>Assigned</option><option>In Progress</option><option>Pending Customer</option><option>Pending Vendor</option><option>Resolved</option><option>Closed</option></select><input type='datetime-local' id='rdate'></div>
+<input id='rnote' placeholder='Reminder Note'>
+<button onclick='createTicket()'>Create Ticket</button>
+<button onclick='exportExcel()'>Export Excel</button>
+<button onclick='showAdmin()'>🔧 Admin</button>
+</div>
+<table class='table'><thead><tr><th>Ticket</th><th>Customer</th><th>Status</th><th>Description</th></tr></thead><tbody id='list'></tbody></table>
+<div id='admin'><div class='panel'><h3>Admin Panel</h3><input id='adminPass' placeholder='Password'><button onclick='loginAdmin()'>Login</button><div id='adminTools' style='display:none'><button onclick='deleteClosed()'>Delete Closed Tickets</button></div><button onclick="document.getElementById('admin').style.display='none'">Close</button></div></div>
+<div id='reminderModal'><div class='panel'><h3>🔔 Reminder</h3><div id='remText'></div><button onclick='ackReminder()'>OK</button></div></div>
+<script>
+let tickets=JSON.parse(localStorage.getItem('tickets_v6')||'[]');let activeReminder=null;
+function save(){localStorage.setItem('tickets_v6',JSON.stringify(tickets))}
+function ticketId(){return 'INC'+String(Date.now()).slice(-6)}
+function createTicket(){tickets.push({id:ticketId(),customer:customer.value,from:document.getElementById('from').value,short:short.value,detail:detail.value,status:status.value,reminderDate:rdate.value,reminderNote:rnote.value,reminderDone:false,notes:[]});save();render();}
+function badge(s){if(s=='Open')return 'open';if(s=='Assigned')return 'assigned';if(s=='In Progress')return 'progress';if(s.includes('Pending'))return 'pending';if(s=='Resolved')return 'resolved';return 'closed';}
+function toggle(i){let d=document.getElementById('d'+i);d.style.display=d.style.display==='block'?'none':'block';}
+function addNote(i){let n=document.getElementById('note'+i).value;if(!n)return;tickets[i].notes.push({date:new Date().toLocaleString(),text:n});save();render();}
+function saveReminder(i){tickets[i].reminderDate=document.getElementById('rd'+i).value;tickets[i].reminderNote=document.getElementById('rn'+i).value;tickets[i].reminderDone=false;save();render();}
+function deleteTicket(i){if(confirm('Delete ticket?')){tickets.splice(i,1);save();render();}}
+function render(){list.innerHTML='';tickets.forEach((t,i)=>{list.innerHTML+=`<tr onclick='toggle(${i})'><td>${t.id}</td><td>${t.customer}</td><td><span class='badge ${badge(t.status)}'>${t.status}</span></td><td>${t.short}</td></tr><tr><td colspan='4'><div id='d${i}' class='detail'><b>Details:</b> ${t.detail}<br><br><input id='rd${i}' type='datetime-local' value='${t.reminderDate||""}'><input id='rn${i}' value='${t.reminderNote||""}' placeholder='Reminder Note'><button onclick='event.stopPropagation();saveReminder(${i})'>Save Reminder</button><button onclick='event.stopPropagation();deleteTicket(${i})'>Delete Ticket</button><textarea id='note${i}' placeholder='Add note'></textarea><button onclick='event.stopPropagation();addNote(${i})'>Save Note</button>${t.notes.map(n=>`<div>${n.date}<br>${n.text}</div>`).join('')}</div></td></tr>`});total.innerText=tickets.length;openCount.innerText=tickets.filter(x=>x.status!='Closed').length;pendingCount.innerText=tickets.filter(x=>x.status.includes('Pending')).length;closedCount.innerText=tickets.filter(x=>x.status=='Closed').length;remCount.innerText=tickets.filter(x=>x.reminderDate&&!x.reminderDone).length;}
+function exportExcel(){let ws=XLSX.utils.json_to_sheet(tickets);let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Tickets');XLSX.writeFile(wb,'Tickets_Backup.xlsx');}
+function showAdmin(){admin.style.display='block'}
+function loginAdmin(){if(adminPass.value==='admin123')adminTools.style.display='block';}
+function deleteClosed(){tickets=tickets.filter(t=>t.status!=='Closed');save();render();}
+function check(){let now=new Date();for(let i=0;i<tickets.length;i++){let t=tickets[i];if(t.reminderDate&&!t.reminderDone&&new Date(t.reminderDate)<=now){activeReminder=i;remText.innerHTML='<b>'+t.id+'</b><br>'+t.reminderNote;reminderModal.style.display='block';break;}}}
+function ackReminder(){if(activeReminder!==null){tickets[activeReminder].reminderDone=true;save();}reminderModal.style.display='none';activeReminder=null;}
+setInterval(check,30000);render();
+</script></body></html>

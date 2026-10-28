@@ -35,6 +35,19 @@
         margin-bottom: 12px;
       }
 
+      .stat-filter {
+        width: 100%;
+        color: inherit;
+        font: inherit;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .stat-filter[aria-pressed="true"] {
+        border-color: #4a90e2;
+        box-shadow: 0 0 0 2px #4a90e2;
+      }
+
       .toolbar {
         display: flex;
         gap: 10px;
@@ -138,11 +151,21 @@
     <h1>Ticket Dashboard V4</h1>
 
     <div class="stats">
-      <div class="stat">Total: <span id="t">0</span></div>
-      <div class="stat">Active: <span id="o">0</span></div>
-      <div class="stat">In Progress: <span id="i">0</span></div>
-      <div class="stat">Pending: <span id="p">0</span></div>
-      <div class="stat">Closed: <span id="c">0</span></div>
+      <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
+        Total: <span id="t">0</span>
+      </button>
+      <button type="button" class="stat stat-filter" data-category="Active" aria-pressed="false" onclick="setCategoryFilter('Active')">
+        Active: <span id="o">0</span>
+      </button>
+      <button type="button" class="stat stat-filter" data-category="In Progress" aria-pressed="false" onclick="setCategoryFilter('In Progress')">
+        In Progress: <span id="i">0</span>
+      </button>
+      <button type="button" class="stat stat-filter" data-category="Pending" aria-pressed="false" onclick="setCategoryFilter('Pending')">
+        Pending: <span id="p">0</span>
+      </button>
+      <button type="button" class="stat stat-filter" data-category="Closed" aria-pressed="false" onclick="setCategoryFilter('Closed')">
+        Closed: <span id="c">0</span>
+      </button>
     </div>
 
     <div class="card">
@@ -169,9 +192,13 @@
 
     <div class="toolbar">
       <input id="search" placeholder="Search Ticket #" onkeyup="render()">
-      <select id="filter" onchange="render()">
-        <option>All</option>
-        <option value="Active">Active</option>
+      <select id="status-filter" aria-label="Filter by status" onchange="render()">
+        <option value="All">All statuses</option>
+        <option>Assigned</option>
+        <option>In Progress</option>
+        <option>Pending Customer</option>
+        <option>Pending Vendor</option>
+        <option>Resolved</option>
         <option>Closed</option>
       </select>
     </div>
@@ -182,6 +209,9 @@
           <th>Ticket #</th>
           <th>Customer</th>
           <th>Status</th>
+          <th>Created</th>
+          <th>Ticket From</th>
+          <th>Last Updated</th>
           <th>Description</th>
           <th>Actions</th>
         </tr>
@@ -191,6 +221,7 @@
 
     <script>
       const storageKey = "tickets_v4";
+      let activeCategory = "All";
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -253,6 +284,7 @@
           shortDescription: document.getElementById("sd").value,
           assignedDate: document.getElementById("ad").value,
           status: document.getElementById("st").value,
+          createdAt: new Date().toISOString(),
           lastUpdate: new Date().toLocaleString(),
           notes: [],
         };
@@ -282,9 +314,30 @@
       }
 
       function statusChange(index, status) {
+        if (tickets[index].status === status) return;
         tickets[index].status = status;
+        tickets[index].lastUpdate = new Date().toLocaleString();
         save();
         render();
+      }
+
+      function setCategoryFilter(category) {
+        activeCategory = category;
+        render();
+      }
+
+      function matchesCategory(ticket) {
+        if (activeCategory === "Active") return ticket.status !== "Closed";
+        if (activeCategory === "In Progress") return ticket.status === "In Progress";
+        if (activeCategory === "Pending") return ticket.status.includes("Pending");
+        if (activeCategory === "Closed") return ticket.status === "Closed";
+        return true;
+      }
+
+      function formatDate(value, options) {
+        if (!value) return "—";
+        const date = new Date(value);
+        return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, options);
       }
 
       function deleteTicket(index) {
@@ -300,17 +353,19 @@
 
       function render() {
         const searchTerm = document.getElementById("search").value.toLowerCase();
-        const filter = document.getElementById("filter").value;
+        const statusFilter = document.getElementById("status-filter").value;
         let visibleTickets = tickets.filter((ticket) =>
           ticket.ticketNumber.toLowerCase().includes(searchTerm)
         );
 
-        if (filter === "Active") {
-          visibleTickets = visibleTickets.filter((ticket) => ticket.status !== "Closed");
-        }
-        if (filter === "Closed") {
-          visibleTickets = visibleTickets.filter((ticket) => ticket.status === "Closed");
-        }
+        visibleTickets = visibleTickets.filter((ticket) =>
+          matchesCategory(ticket) &&
+          (statusFilter === "All" || ticket.status === statusFilter)
+        );
+
+        document.querySelectorAll(".stat-filter").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));
+        });
 
         const ticketList = document.getElementById("list");
         ticketList.innerHTML = "";
@@ -322,6 +377,9 @@
               <td>${ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>
+              <td>${formatDate(ticket.createdAt, { dateStyle: "medium" })}</td>
+              <td>${ticket.ticketFrom || "—"}</td>
+              <td>${ticket.lastUpdate || "—"}</td>
               <td>${ticket.shortDescription}</td>
               <td>
                 <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">
@@ -330,7 +388,7 @@
               </td>
             </tr>
             <tr>
-              <td colspan="5">
+              <td colspan="8">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>

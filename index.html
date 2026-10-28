@@ -1,1 +1,325 @@
-<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Ticket Dashboard V4</title><script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script><style>body{font-family:Segoe UI,Arial;background:#f5f7fa;margin:20px;color:#333}.card,.stat{background:#fff;border:1px solid #d3dce6;border-radius:8px;padding:12px}.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:12px}.toolbar{display:flex;gap:10px;margin:10px 0}input,textarea,select{width:100%;padding:8px;margin:5px 0}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{background:#4a90e2;color:#fff;border:none;padding:10px;border-radius:6px}.table{width:100%;border-collapse:collapse;background:#fff}.table th{background:#dce6f1}.table th,.table td{padding:10px;border:1px solid #d3dce6}.detail{display:none;background:#fafcff;padding:10px}.note{background:#eef4fb;padding:6px;margin:4px 0}.reminderModal{position:fixed;inset:0;background:rgba(0,0,0,.4);display:none;align-items:center;justify-content:center}.reminderBox{background:#fff;padding:20px;border-radius:10px;width:400px}.notif{position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#4a90e2;color:#fff;padding:10px;border-radius:8px;display:none}</style></head><body><div id=n class=notif></div><div id=rm class=reminderModal><div class=reminderBox><h3>🔔 Ticket Reminder</h3><div id=rmText></div><br><button class=btn onclick="ackReminder()">OK</button></div></div><h1>Ticket Dashboard V4</h1><div class=stats><div class=stat>Total: <span id=t>0</span></div><div class=stat>Open: <span id=o>0</span></div><div class=stat>In Progress: <span id=i>0</span></div><div class=stat>Pending: <span id=p>0</span></div><div class=stat>Closed: <span id=c>0</span></div></div><div class=card><h3>Create Ticket</h3><div class=row><input id=tn placeholder='Ticket Number (leave blank for auto)'><input id=cn placeholder='Customer Name'></div><input id=tf placeholder='Ticket From'><input id=sd placeholder='Short Description'><textarea id=td placeholder='Ticket Detail'></textarea><div class=row><input type=date id=ad><select id=st><option>Open</option><option>Assigned</option><option>In Progress</option><option>Pending Customer</option><option>Pending Vendor</option><option>Resolved</option><option>Closed</option></select></div><div class=row><input type=datetime-local id=rd><input id=rn placeholder='Reminder Note'></div><button class=btn onclick='createTicket()'>Create Ticket</button></div><div class='toolbar'><input id=search placeholder='Search Ticket #' onkeyup='render()'><select id=filter onchange='render()'><option>All</option><option value='Open'>Open (Active)</option><option>Closed</option></select><input type=file id=excel accept='.xlsx,.xls'></div><div class='toolbar'><button class=btn onclick='importExcel()'>📂 Import Excel</button><button class=btn onclick='exportExcel()'>💾 Export Excel</button></div><table class=table><thead><tr><th>Ticket #</th><th>Customer</th><th>Status</th><th>Description</th></tr></thead><tbody id=list></tbody></table><script>let tickets=JSON.parse(localStorage.getItem('tickets_v4')||'[]');let activeReminder=null;function save(){localStorage.setItem('tickets_v4',JSON.stringify(tickets))}function pop(m){n.innerText=m;n.style.display='block';setTimeout(()=>n.style.display='none',2500)}function nextId(){return 'INC'+String(tickets.length+1).padStart(6,'0')}function createTicket(){let r={ticketNumber:tn.value||nextId(),customerName:cn.value,ticketFrom:tf.value,shortDescription:sd.value,ticketDetail:td.value,assignedDate:ad.value,status:st.value,lastUpdate:new Date().toLocaleString(),reminderDate:rd.value,reminderNote:rn.value,reminderDone:false,notes:[]};tickets.push(r);save();render();pop('Ticket Created')}function toggle(i){let d=document.getElementById('d'+i);d.style.display=d.style.display==='block'?'none':'block'}function addNote(i){let x=document.getElementById('note'+i).value.trim();if(!x)return;tickets[i].notes.push({date:new Date().toLocaleString(),text:x});save();render()}function statusChange(i,v){tickets[i].status=v;save();render()}function render(){let s=search.value?.toLowerCase()||'';let f=filter.value;let arr=tickets.filter(x=>x.ticketNumber.toLowerCase().includes(s));if(f==='Open')arr=arr.filter(x=>x.status!=='Closed');if(f==='Closed')arr=arr.filter(x=>x.status==='Closed');list.innerHTML='';arr.forEach(x=>{let i=tickets.indexOf(x);list.innerHTML+=`<tr onclick='toggle(${i})'><td>${x.ticketNumber}</td><td>${x.customerName}</td><td>${x.status}</td><td>${x.shortDescription}</td></tr><tr><td colspan='4'><div class='detail' id='d${i}'><b>Details:</b> ${x.ticketDetail}<br><b>Reminder:</b> ${x.reminderDate||'None'} ${x.reminderNote||''}<br><select onchange='statusChange(${i},this.value)'><option selected>${x.status}</option><option>Open</option><option>Assigned</option><option>In Progress</option><option>Pending Customer</option><option>Pending Vendor</option><option>Resolved</option><option>Closed</option></select><textarea id='note${i}' placeholder='Add note'></textarea><button class=btn onclick='event.stopPropagation();addNote(${i})'>Save Note</button>${x.notes.map(n=>`<div class=note>${n.date}<br>${n.text}</div>`).join('')}</div></td></tr>`});t.innerText=tickets.length;o.innerText=tickets.filter(x=>x.status!=='Closed').length;i.innerText=tickets.filter(x=>x.status==='In Progress').length;p.innerText=tickets.filter(x=>x.status.includes('Pending')).length;c.innerText=tickets.filter(x=>x.status==='Closed').length;}function checkReminders(){let now=new Date();for(let k=0;k<tickets.length;k++){let r=tickets[k];if(r.reminderDate&&!r.reminderDone&&new Date(r.reminderDate)<=now){activeReminder=k;rmText.innerHTML='<b>'+r.ticketNumber+'</b><br>'+r.reminderNote;rm.style.display='flex';break;}}}function ackReminder(){if(activeReminder!==null){tickets[activeReminder].reminderDone=true;save();}rm.style.display='none';activeReminder=null;}setInterval(checkReminders,30000);checkReminders();function exportExcel(){let rows=tickets.map(t=>({...t,notes:JSON.stringify(t.notes)}));let ws=XLSX.utils.json_to_sheet(rows);let wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,'Tickets');XLSX.writeFile(wb,'Tickets_Backup.xlsx');}function importExcel(){let f=excel.files[0];if(!f)return;let reader=new FileReader();reader.onload=e=>{let wb=XLSX.read(e.target.result,{type:'array'});let ws=wb.Sheets[wb.SheetNames[0]];tickets=XLSX.utils.sheet_to_json(ws);save();render();};reader.readAsArrayBuffer(f);}render();</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Ticket Dashboard V4</title>
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 20px;
+        color: #333;
+        background: #f5f7fa;
+        font-family: Segoe UI, Arial, sans-serif;
+      }
+
+      .card,
+      .stat {
+        padding: 12px;
+        border: 1px solid #d3dce6;
+        border-radius: 8px;
+        background: #fff;
+      }
+
+      .card {
+        width: 100%;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .toolbar {
+        display: flex;
+        gap: 10px;
+        margin: 10px 0;
+      }
+
+      input,
+      textarea,
+      select {
+        width: 100%;
+        margin: 5px 0;
+        padding: 8px;
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+
+      .row > * {
+        min-width: 0;
+      }
+
+      .btn {
+        padding: 10px;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        background: #4a90e2;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        background: #fff;
+      }
+
+      .table th {
+        background: #dce6f1;
+      }
+
+      .table th,
+      .table td {
+        padding: 10px;
+        border: 1px solid #d3dce6;
+      }
+
+      .detail {
+        display: none;
+        padding: 10px;
+        background: #fafcff;
+      }
+
+      .note {
+        margin: 4px 0;
+        padding: 6px;
+        background: #eef4fb;
+      }
+
+      .notif {
+        position: fixed;
+        top: 10px;
+        left: 50%;
+        display: none;
+        padding: 10px;
+        transform: translateX(-50%);
+        border-radius: 8px;
+        color: #fff;
+        background: #4a90e2;
+      }
+
+      @media (max-width: 600px) {
+        body {
+          margin: 12px;
+        }
+
+        .stats {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .row,
+        .toolbar {
+          grid-template-columns: 1fr;
+          flex-direction: column;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="n" class="notif"></div>
+    <h1>Ticket Dashboard V4</h1>
+
+    <div class="stats">
+      <div class="stat">Total: <span id="t">0</span></div>
+      <div class="stat">Active: <span id="o">0</span></div>
+      <div class="stat">In Progress: <span id="i">0</span></div>
+      <div class="stat">Pending: <span id="p">0</span></div>
+      <div class="stat">Closed: <span id="c">0</span></div>
+    </div>
+
+    <div class="card">
+      <h3>Create Ticket</h3>
+      <div class="row">
+        <input id="tn" placeholder="Ticket Number (leave blank for auto)">
+        <input id="cn" placeholder="Customer Name">
+      </div>
+      <input id="tf" placeholder="Ticket From">
+      <input id="sd" placeholder="Short Description">
+      <div class="row">
+        <input type="date" id="ad">
+        <select id="st">
+          <option>Assigned</option>
+          <option>In Progress</option>
+          <option>Pending Customer</option>
+          <option>Pending Vendor</option>
+          <option>Resolved</option>
+          <option>Closed</option>
+        </select>
+      </div>
+      <button class="btn" onclick="createTicket()">Create Ticket</button>
+    </div>
+
+    <div class="toolbar">
+      <input id="search" placeholder="Search Ticket #" onkeyup="render()">
+      <select id="filter" onchange="render()">
+        <option>All</option>
+        <option value="Active">Active</option>
+        <option>Closed</option>
+      </select>
+    </div>
+
+    <table class="table">
+      <thead>
+        <tr>
+          <th>Ticket #</th>
+          <th>Customer</th>
+          <th>Status</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody id="list"></tbody>
+    </table>
+
+    <script>
+      const storageKey = "tickets_v4";
+      let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
+        .map((ticket) => {
+          const cleanedTicket = stripLegacyReminderFields(ticket);
+          if (cleanedTicket.status === "Open") cleanedTicket.status = "Assigned";
+          return cleanedTicket;
+        });
+
+      function stripLegacyReminderFields(ticket) {
+        const cleanedTicket = { ...ticket };
+        delete cleanedTicket.reminderDate;
+        delete cleanedTicket.reminderNote;
+        delete cleanedTicket.reminderDone;
+        return cleanedTicket;
+      }
+
+      function save() {
+        localStorage.setItem(storageKey, JSON.stringify(tickets));
+      }
+
+      save();
+
+      function pop(message) {
+        const notification = document.getElementById("n");
+        notification.innerText = message;
+        notification.style.display = "block";
+        setTimeout(() => {
+          notification.style.display = "none";
+        }, 2500);
+      }
+
+      function nextId() {
+        return `INC${String(tickets.length + 1).padStart(6, "0")}`;
+      }
+
+      function createTicket() {
+        const ticket = {
+          ticketNumber: document.getElementById("tn").value || nextId(),
+          customerName: document.getElementById("cn").value,
+          ticketFrom: document.getElementById("tf").value,
+          shortDescription: document.getElementById("sd").value,
+          assignedDate: document.getElementById("ad").value,
+          status: document.getElementById("st").value,
+          lastUpdate: new Date().toLocaleString(),
+          notes: [],
+        };
+
+        tickets.push(ticket);
+        save();
+        render();
+        pop("Ticket Created");
+      }
+
+      function toggle(index) {
+        const detail = document.getElementById(`d${index}`);
+        detail.style.display = detail.style.display === "block" ? "none" : "block";
+      }
+
+      function addNote(index) {
+        const noteInput = document.getElementById(`note${index}`);
+        const text = noteInput.value.trim();
+        if (!text) return;
+
+        tickets[index].notes.push({
+          date: new Date().toLocaleString(),
+          text,
+        });
+        save();
+        render();
+      }
+
+      function statusChange(index, status) {
+        tickets[index].status = status;
+        save();
+        render();
+      }
+
+      function render() {
+        const searchTerm = document.getElementById("search").value.toLowerCase();
+        const filter = document.getElementById("filter").value;
+        let visibleTickets = tickets.filter((ticket) =>
+          ticket.ticketNumber.toLowerCase().includes(searchTerm)
+        );
+
+        if (filter === "Active") {
+          visibleTickets = visibleTickets.filter((ticket) => ticket.status !== "Closed");
+        }
+        if (filter === "Closed") {
+          visibleTickets = visibleTickets.filter((ticket) => ticket.status === "Closed");
+        }
+
+        const ticketList = document.getElementById("list");
+        ticketList.innerHTML = "";
+
+        visibleTickets.forEach((ticket) => {
+          const index = tickets.indexOf(ticket);
+          ticketList.innerHTML += `
+            <tr onclick="toggle(${index})">
+              <td>${ticket.ticketNumber}</td>
+              <td>${ticket.customerName}</td>
+              <td>${ticket.status}</td>
+              <td>${ticket.shortDescription}</td>
+            </tr>
+            <tr>
+              <td colspan="4">
+                <div class="detail" id="d${index}">
+                  <select onchange="statusChange(${index}, this.value)">
+                    <option selected>${ticket.status}</option>
+                    <option>Assigned</option>
+                    <option>In Progress</option>
+                    <option>Pending Customer</option>
+                    <option>Pending Vendor</option>
+                    <option>Resolved</option>
+                    <option>Closed</option>
+                  </select>
+                  <textarea id="note${index}" placeholder="Add note"></textarea>
+                  <button class="btn" onclick="event.stopPropagation(); addNote(${index})">
+                    Save Note
+                  </button>
+                  ${ticket.notes.map((note) => `
+                    <div class="note">${note.date}<br>${note.text}</div>
+                  `).join("")}
+                </div>
+              </td>
+            </tr>
+          `;
+        });
+
+        document.getElementById("t").innerText = tickets.length;
+        document.getElementById("o").innerText =
+          tickets.filter((ticket) => ticket.status !== "Closed").length;
+        document.getElementById("i").innerText =
+          tickets.filter((ticket) => ticket.status === "In Progress").length;
+        document.getElementById("p").innerText =
+          tickets.filter((ticket) => ticket.status.includes("Pending")).length;
+        document.getElementById("c").innerText =
+          tickets.filter((ticket) => ticket.status === "Closed").length;
+      }
+
+      render();
+    </script>
+  </body>
+</html>

@@ -212,12 +212,32 @@
       }
 
       function nextId() {
-        return `INC${String(tickets.length + 1).padStart(6, "0")}`;
+        let id = tickets.length + 1;
+        let ticketNumber = `INC${String(id).padStart(6, "0")}`;
+        while (hasTicketNumber(ticketNumber)) {
+          id += 1;
+          ticketNumber = `INC${String(id).padStart(6, "0")}`;
+        }
+        return ticketNumber;
+      }
+
+      function hasTicketNumber(ticketNumber) {
+        const normalizedTicketNumber = ticketNumber.trim().toLowerCase();
+        return tickets.some(
+          (ticket) => ticket.ticketNumber.trim().toLowerCase() === normalizedTicketNumber
+        );
       }
 
       function createTicket() {
+        const enteredTicketNumber = document.getElementById("tn").value.trim();
+        const ticketNumber = enteredTicketNumber || nextId();
+        if (hasTicketNumber(ticketNumber)) {
+          pop("A ticket with this number already exists");
+          return;
+        }
+
         const ticket = {
-          ticketNumber: document.getElementById("tn").value || nextId(),
+          ticketNumber,
           customerName: document.getElementById("cn").value,
           ticketFrom: document.getElementById("tf").value,
           shortDescription: document.getElementById("sd").value,

@@ -287,7 +287,7 @@
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
         </select>
-        <span>Set a ticket's position: 1 is the top; 99 moves it to the bottom.</span>
+        <span>Set a ticket's position: 1 is the top; the last position moves it to the bottom.</span>
       </div>
 
       <table class="table">
@@ -644,8 +644,8 @@
         const visibleTickets = getVisibleTickets();
         const currentPosition = visibleTickets.indexOf(tickets[index]);
         const position = Number(requestedPosition);
-        if (!Number.isInteger(position) || position < 1 || position > 99) {
-          pop("Enter a position from 1 to 99");
+        if (!Number.isInteger(position) || position < 1 || position > visibleTickets.length) {
+          pop(`Enter a position from 1 to ${visibleTickets.length}`);
           render();
           return;
         }
@@ -707,10 +707,10 @@
                   class="position-input"
                   type="number"
                   min="1"
-                  max="99"
+                  max="${visibleTickets.length}"
                   value="${visiblePosition + 1}"
                   aria-label="Position for ticket ${ticket.ticketNumber}"
-                  title="1 is the top; 99 moves to the bottom"
+                  title="1 is the top; ${visibleTickets.length} moves to the bottom"
                   onchange="event.stopPropagation(); moveTicketToPosition(${index}, this.value)"
                   onclick="event.stopPropagation()"
                 >

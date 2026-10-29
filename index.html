@@ -125,24 +125,19 @@
         background: #edf8f0;
       }
 
-      .ticket-row {
-        cursor: grab;
+      .move-btn {
+        min-width: 32px;
+        margin: 0 2px;
+        padding: 5px 8px;
+        border: 1px solid #b8c5d3;
+        border-radius: 4px;
+        background: #fff;
+        cursor: pointer;
       }
 
-      .ticket-row:active {
-        cursor: grabbing;
-      }
-
-      .ticket-row-dragging {
-        opacity: 0.45;
-      }
-
-      .ticket-row-drop-before td {
-        border-top: 3px solid #4a90e2;
-      }
-
-      .ticket-row-drop-after td {
-        border-bottom: 3px solid #4a90e2;
+      .move-btn:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
       }
 
       .table {
@@ -301,7 +296,7 @@
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
         </select>
-        <span>Drag a ticket row to change its order.</span>
+        <span>Use the arrows to change ticket order.</span>
       </div>
 
       <table class="table">
@@ -314,6 +309,7 @@
             <th>Ticket From</th>
             <th>Last Updated</th>
             <th>Description</th>
+            <th>Order</th>
             <th>Actions</th>
           </tr>
         </thead>
@@ -334,7 +330,6 @@
       let lastHourlyReminderKey = "";
       let notificationQueue = [];
       let previousFocus = null;
-      let draggedTicket = null;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -640,60 +635,29 @@
         return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, options);
       }
 
-      function startTicketDrag(event, index) {
-        draggedTicket = tickets[index];
-        event.dataTransfer.effectAllowed = "move";
-        event.dataTransfer.setData("text/plain", draggedTicket.ticketNumber);
-        event.currentTarget.classList.add("ticket-row-dragging");
+      function getVisibleTickets() {
+        const searchTerm = document.getElementById("search").value.toLowerCase();
+        const statusFilter = document.getElementById("status-filter").value;
+        return tickets.filter((ticket) =>
+          ticket.ticketNumber.toLowerCase().includes(searchTerm) &&
+          matchesCategory(ticket) &&
+          (
+            statusFilter === "All" ||
+            (statusFilter === "Open" && ticket.status !== "Closed") ||
+            (statusFilter === "Closed" && ticket.status === "Closed")
+          )
+        );
       }
 
-      function dragOverTicket(event) {
-        event.preventDefault();
-        if (!draggedTicket) return;
+      function moveTicket(index, direction) {
+        const visibleTickets = getVisibleTickets();
+        const currentPosition = visibleTickets.indexOf(tickets[index]);
+        const targetTicket = visibleTickets[currentPosition + direction];
+        if (!targetTicket) return;
 
-        event.dataTransfer.dropEffect = "move";
-        const row = event.currentTarget;
-        const isAfter = event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2;
-        row.classList.toggle("ticket-row-drop-before", !isAfter);
-        row.classList.toggle("ticket-row-drop-after", isAfter);
-      }
-
-      function clearTicketDragStyles() {
-        document.querySelectorAll(".ticket-row-dragging, .ticket-row-drop-before, .ticket-row-drop-after")
-          .forEach((row) => row.classList.remove(
-            "ticket-row-dragging",
-            "ticket-row-drop-before",
-            "ticket-row-drop-after"
-          ));
-      }
-
-      function endTicketDrag() {
-        draggedTicket = null;
-        clearTicketDragStyles();
-      }
-
-      function dropTicket(event, targetIndex) {
-        event.preventDefault();
-        const targetTicket = tickets[targetIndex];
-        if (!draggedTicket || draggedTicket === targetTicket) {
-          endTicketDrag();
-          return;
-        }
-
-        const targetRow = event.currentTarget;
-        const isAfter = event.clientY > targetRow.getBoundingClientRect().top + targetRow.offsetHeight / 2;
-        const draggedIndex = tickets.indexOf(draggedTicket);
-        const originalTargetIndex = tickets.indexOf(targetTicket);
-        if (draggedIndex < 0 || originalTargetIndex < 0) {
-          endTicketDrag();
-          return;
-        }
-
-        tickets.splice(draggedIndex, 1);
-        const targetIndexAfterRemoval = tickets.indexOf(targetTicket);
-        tickets.splice(targetIndexAfterRemoval + (isAfter ? 1 : 0), 0, draggedTicket);
+        const targetIndex = tickets.indexOf(targetTicket);
+        [tickets[index], tickets[targetIndex]] = [tickets[targetIndex], tickets[index]];
         save();
-        endTicketDrag();
         render();
       }
 
@@ -709,20 +673,7 @@
       }
 
       function render() {
-        const searchTerm = document.getElementById("search").value.toLowerCase();
-        const statusFilter = document.getElementById("status-filter").value;
-        let visibleTickets = tickets.filter((ticket) =>
-          ticket.ticketNumber.toLowerCase().includes(searchTerm)
-        );
-
-        visibleTickets = visibleTickets.filter((ticket) =>
-          matchesCategory(ticket) &&
-          (
-            statusFilter === "All" ||
-            (statusFilter === "Open" && ticket.status !== "Closed") ||
-            (statusFilter === "Closed" && ticket.status === "Closed")
-          )
-        );
+        const visibleTickets = getVisibleTickets();
 
         document.querySelectorAll(".stat-filter").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));
@@ -735,17 +686,11 @@
         document.getElementById("load-more-container").hidden =
           visibleTickets.length <= visibleTicketLimit;
 
-        ticketsToRender.forEach((ticket) => {
+        ticketsToRender.forEach((ticket, visiblePosition) => {
           const index = tickets.indexOf(ticket);
           ticketList.innerHTML += `
             <tr
-              class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
-              draggable="true"
-              ondragstart="startTicketDrag(event, ${index})"
-              ondragover="dragOverTicket(event)"
-              ondragleave="event.currentTarget.classList.remove('ticket-row-drop-before', 'ticket-row-drop-after')"
-              ondrop="dropTicket(event, ${index})"
-              ondragend="endTicketDrag()"
+              class="priority-row-${ticket.priority.toLowerCase()}"
               onclick="toggle(${index})"
             >
               <td>${ticket.ticketNumber}</td>
@@ -756,13 +701,31 @@
               <td>${ticket.lastUpdate || "—"}</td>
               <td>${ticket.shortDescription}</td>
               <td>
+                <button
+                  class="move-btn"
+                  type="button"
+                  aria-label="Move ${ticket.ticketNumber} up"
+                  title="Move up"
+                  ${visiblePosition === 0 ? "disabled" : ""}
+                  onclick="event.stopPropagation(); moveTicket(${index}, -1)"
+                >↑</button>
+                <button
+                  class="move-btn"
+                  type="button"
+                  aria-label="Move ${ticket.ticketNumber} down"
+                  title="Move down"
+                  ${visiblePosition === visibleTickets.length - 1 ? "disabled" : ""}
+                  onclick="event.stopPropagation(); moveTicket(${index}, 1)"
+                >↓</button>
+              </td>
+              <td>
                 <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">
                   Delete
                 </button>
               </td>
             </tr>
             <tr>
-              <td colspan="8">
+              <td colspan="9">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>

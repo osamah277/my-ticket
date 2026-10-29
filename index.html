@@ -125,6 +125,26 @@
         background: #edf8f0;
       }
 
+      .ticket-row {
+        cursor: grab;
+      }
+
+      .ticket-row:active {
+        cursor: grabbing;
+      }
+
+      .ticket-row-dragging {
+        opacity: 0.45;
+      }
+
+      .ticket-row-drop-before td {
+        border-top: 3px solid #4a90e2;
+      }
+
+      .ticket-row-drop-after td {
+        border-bottom: 3px solid #4a90e2;
+      }
+
       .table {
         width: 100%;
         border-collapse: collapse;
@@ -281,14 +301,7 @@
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
         </select>
-        <select id="sort-order" aria-label="Sort tickets" onchange="resetTicketList()">
-          <option value="default">Default order</option>
-          <option value="priority-high">Priority: High to Low</option>
-          <option value="priority-low">Priority: Low to High</option>
-          <option value="ticket-ascending">Ticket number: A to Z</option>
-          <option value="ticket-descending">Ticket number: Z to A</option>
-          <option value="updated">Last updated: Newest first</option>
-        </select>
+        <span>Drag a ticket row to change its order.</span>
       </div>
 
       <table class="table">
@@ -321,6 +334,7 @@
       let lastHourlyReminderKey = "";
       let notificationQueue = [];
       let previousFocus = null;
+      let draggedTicket = null;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -626,31 +640,61 @@
         return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, options);
       }
 
-      function sortTickets(ticketList, sortOrder) {
-        const priorityRank = { High: 0, Medium: 1, Low: 2 };
-        const originalOrder = new Map(tickets.map((ticket, index) => [ticket, index]));
+      function startTicketDrag(event, index) {
+        draggedTicket = tickets[index];
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", draggedTicket.ticketNumber);
+        event.currentTarget.classList.add("ticket-row-dragging");
+      }
 
-        return ticketList.sort((first, second) => {
-          if (sortOrder === "priority-high") {
-            return priorityRank[first.priority] - priorityRank[second.priority];
-          }
-          if (sortOrder === "priority-low") {
-            return priorityRank[second.priority] - priorityRank[first.priority];
-          }
-          if (sortOrder === "ticket-ascending") {
-            return first.ticketNumber.localeCompare(second.ticketNumber, undefined, { numeric: true });
-          }
-          if (sortOrder === "ticket-descending") {
-            return second.ticketNumber.localeCompare(first.ticketNumber, undefined, { numeric: true });
-          }
-          if (sortOrder === "updated") {
-            const firstUpdatedAt = Date.parse(first.lastUpdate);
-            const secondUpdatedAt = Date.parse(second.lastUpdate);
-            return (Number.isNaN(secondUpdatedAt) ? 0 : secondUpdatedAt) -
-              (Number.isNaN(firstUpdatedAt) ? 0 : firstUpdatedAt);
-          }
-          return originalOrder.get(first) - originalOrder.get(second);
-        });
+      function dragOverTicket(event) {
+        event.preventDefault();
+        if (!draggedTicket) return;
+
+        event.dataTransfer.dropEffect = "move";
+        const row = event.currentTarget;
+        const isAfter = event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2;
+        row.classList.toggle("ticket-row-drop-before", !isAfter);
+        row.classList.toggle("ticket-row-drop-after", isAfter);
+      }
+
+      function clearTicketDragStyles() {
+        document.querySelectorAll(".ticket-row-dragging, .ticket-row-drop-before, .ticket-row-drop-after")
+          .forEach((row) => row.classList.remove(
+            "ticket-row-dragging",
+            "ticket-row-drop-before",
+            "ticket-row-drop-after"
+          ));
+      }
+
+      function endTicketDrag() {
+        draggedTicket = null;
+        clearTicketDragStyles();
+      }
+
+      function dropTicket(event, targetIndex) {
+        event.preventDefault();
+        const targetTicket = tickets[targetIndex];
+        if (!draggedTicket || draggedTicket === targetTicket) {
+          endTicketDrag();
+          return;
+        }
+
+        const targetRow = event.currentTarget;
+        const isAfter = event.clientY > targetRow.getBoundingClientRect().top + targetRow.offsetHeight / 2;
+        const draggedIndex = tickets.indexOf(draggedTicket);
+        const originalTargetIndex = tickets.indexOf(targetTicket);
+        if (draggedIndex < 0 || originalTargetIndex < 0) {
+          endTicketDrag();
+          return;
+        }
+
+        tickets.splice(draggedIndex, 1);
+        const targetIndexAfterRemoval = tickets.indexOf(targetTicket);
+        tickets.splice(targetIndexAfterRemoval + (isAfter ? 1 : 0), 0, draggedTicket);
+        save();
+        endTicketDrag();
+        render();
       }
 
       function deleteTicket(index) {
@@ -667,7 +711,6 @@
       function render() {
         const searchTerm = document.getElementById("search").value.toLowerCase();
         const statusFilter = document.getElementById("status-filter").value;
-        const sortOrder = document.getElementById("sort-order").value;
         let visibleTickets = tickets.filter((ticket) =>
           ticket.ticketNumber.toLowerCase().includes(searchTerm)
         );
@@ -680,8 +723,6 @@
             (statusFilter === "Closed" && ticket.status === "Closed")
           )
         );
-
-        visibleTickets = sortTickets(visibleTickets, sortOrder);
 
         document.querySelectorAll(".stat-filter").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));
@@ -697,7 +738,16 @@
         ticketsToRender.forEach((ticket) => {
           const index = tickets.indexOf(ticket);
           ticketList.innerHTML += `
-            <tr class="priority-row-${ticket.priority.toLowerCase()}" onclick="toggle(${index})">
+            <tr
+              class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
+              draggable="true"
+              ondragstart="startTicketDrag(event, ${index})"
+              ondragover="dragOverTicket(event)"
+              ondragleave="event.currentTarget.classList.remove('ticket-row-drop-before', 'ticket-row-drop-after')"
+              ondrop="dropTicket(event, ${index})"
+              ondragend="endTicketDrag()"
+              onclick="toggle(${index})"
+            >
               <td>${ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>

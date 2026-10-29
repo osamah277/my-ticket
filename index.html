@@ -131,6 +131,22 @@
         text-align: center;
       }
 
+      .ticket-row {
+        cursor: grab;
+      }
+
+      .ticket-row:active {
+        cursor: grabbing;
+      }
+
+      .ticket-row-dragging {
+        opacity: 0.45;
+      }
+
+      .ticket-row-drop-target td {
+        border-top: 3px solid #4a90e2;
+      }
+
       .table {
         width: 100%;
         border-collapse: collapse;
@@ -287,7 +303,6 @@
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
         </select>
-        <span>Set a ticket's position: 1 is the top; the last position moves it to the bottom.</span>
       </div>
 
       <table class="table">
@@ -321,6 +336,7 @@
       let lastHourlyReminderKey = "";
       let notificationQueue = [];
       let previousFocus = null;
+      let draggedTicket = null;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -663,6 +679,51 @@
         render();
       }
 
+      function startTicketDrag(event, index) {
+        draggedTicket = tickets[index];
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", draggedTicket.ticketNumber);
+        event.currentTarget.classList.add("ticket-row-dragging");
+      }
+
+      function dragOverTicket(event) {
+        if (!draggedTicket) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        event.currentTarget.classList.add("ticket-row-drop-target");
+      }
+
+      function endTicketDrag() {
+        draggedTicket = null;
+        document.querySelectorAll(".ticket-row-dragging, .ticket-row-drop-target")
+          .forEach((row) => row.classList.remove("ticket-row-dragging", "ticket-row-drop-target"));
+      }
+
+      function dropTicket(event, targetIndex) {
+        event.preventDefault();
+        const targetTicket = tickets[targetIndex];
+        if (!draggedTicket || draggedTicket === targetTicket) {
+          endTicketDrag();
+          return;
+        }
+
+        const visibleTickets = getVisibleTickets();
+        const draggedPosition = visibleTickets.indexOf(draggedTicket);
+        const targetPosition = visibleTickets.indexOf(targetTicket);
+        if (draggedPosition < 0 || targetPosition < 0) {
+          endTicketDrag();
+          return;
+        }
+
+        const row = event.currentTarget;
+        const isAfter = event.clientY > row.getBoundingClientRect().top + row.offsetHeight / 2;
+        let destinationPosition = targetPosition + (isAfter ? 1 : 0);
+        if (draggedPosition < destinationPosition) destinationPosition -= 1;
+
+        moveTicketToPosition(tickets.indexOf(draggedTicket), destinationPosition + 1);
+        endTicketDrag();
+      }
+
       function deleteTicket(index) {
         const ticket = tickets[index];
         if (!ticket) return;
@@ -692,7 +753,13 @@
           const index = tickets.indexOf(ticket);
           ticketList.innerHTML += `
             <tr
-              class="priority-row-${ticket.priority.toLowerCase()}"
+              class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
+              draggable="true"
+              ondragstart="startTicketDrag(event, ${index})"
+              ondragover="dragOverTicket(event)"
+              ondragleave="event.currentTarget.classList.remove('ticket-row-drop-target')"
+              ondrop="dropTicket(event, ${index})"
+              ondragend="endTicketDrag()"
               onclick="toggle(${index})"
             >
               <td>${ticket.ticketNumber}</td>

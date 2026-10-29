@@ -233,8 +233,8 @@
       </div>
 
       <div class="toolbar">
-        <input id="search" placeholder="Search Ticket #" onkeyup="render()">
-        <select id="status-filter" aria-label="Filter by status" onchange="render()">
+        <input id="search" placeholder="Search Ticket #" oninput="resetTicketList()">
+        <select id="status-filter" aria-label="Filter by status" onchange="resetTicketList()">
           <option value="Open">Open</option>
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
@@ -255,13 +255,18 @@
         </thead>
         <tbody id="list"></tbody>
       </table>
+      <div id="load-more-container" hidden>
+        <button class="btn" type="button" onclick="loadMoreTickets()">Load 20 more tickets</button>
+      </div>
 
     </main>
 
     <script>
       const storageKey = "tickets_v4";
       const reminderInterval = 24 * 60 * 60 * 1000;
+      const ticketPageSize = 20;
       let activeCategory = "All";
+      let visibleTicketLimit = ticketPageSize;
       let lastHourlyReminderKey = "";
       let notificationQueue = [];
       let previousFocus = null;
@@ -520,6 +525,16 @@
 
       function setCategoryFilter(category) {
         activeCategory = category;
+        resetTicketList();
+      }
+
+      function resetTicketList() {
+        visibleTicketLimit = ticketPageSize;
+        render();
+      }
+
+      function loadMoreTickets() {
+        visibleTicketLimit += ticketPageSize;
         render();
       }
 
@@ -571,7 +586,11 @@
         const ticketList = document.getElementById("list");
         ticketList.innerHTML = "";
 
-        visibleTickets.forEach((ticket) => {
+        const ticketsToRender = visibleTickets.slice(0, visibleTicketLimit);
+        document.getElementById("load-more-container").hidden =
+          visibleTickets.length <= visibleTicketLimit;
+
+        ticketsToRender.forEach((ticket) => {
           const index = tickets.indexOf(ticket);
           ticketList.innerHTML += `
             <tr onclick="toggle(${index})">

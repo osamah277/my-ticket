@@ -117,6 +117,17 @@
         background: #eef4fb;
       }
 
+      .reminder {
+        margin-top: 10px;
+        padding: 8px;
+        border: 1px solid #d3dce6;
+        border-radius: 6px;
+      }
+
+      .reminder p {
+        margin: 4px 0 8px;
+      }
+
       .notif {
         position: fixed;
         top: 10px;
@@ -193,13 +204,9 @@
     <div class="toolbar">
       <input id="search" placeholder="Search Ticket #" onkeyup="render()">
       <select id="status-filter" aria-label="Filter by status" onchange="render()">
-        <option value="All">All statuses</option>
-        <option>Assigned</option>
-        <option>In Progress</option>
-        <option>Pending Customer</option>
-        <option>Pending Vendor</option>
-        <option>Resolved</option>
-        <option>Closed</option>
+        <option value="Open">Open</option>
+        <option value="All" selected>All</option>
+        <option value="Closed">Closed</option>
       </select>
     </div>
 
@@ -209,7 +216,6 @@
           <th>Ticket #</th>
           <th>Customer</th>
           <th>Status</th>
-          <th>Created</th>
           <th>Ticket From</th>
           <th>Last Updated</th>
           <th>Description</th>
@@ -232,6 +238,12 @@
             Number.isNaN(Date.parse(cleanedTicket.nextStatusReminderAt))
           ) {
             cleanedTicket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
+          }
+          if (
+            cleanedTicket.ticketReminderAt &&
+            Number.isNaN(Date.parse(cleanedTicket.ticketReminderAt))
+          ) {
+            delete cleanedTicket.ticketReminderAt;
           }
           return cleanedTicket;
         });
@@ -372,6 +384,67 @@
         }
       }
 
+      function setTicketReminder(index) {
+        const ticket = tickets[index];
+        if (!ticket || ticket.ticketReminderAt) {
+          pop("This ticket already has an active reminder");
+          return;
+        }
+
+        const reminderInput = document.getElementById(`reminder${index}`);
+        const reminderTime = Date.parse(reminderInput.value);
+        if (!reminderInput.value || Number.isNaN(reminderTime) || reminderTime <= Date.now()) {
+          pop("Choose a reminder time in the future");
+          return;
+        }
+
+        ticket.ticketReminderAt = new Date(reminderTime).toISOString();
+        save();
+        render();
+        document.getElementById(`d${index}`).style.display = "block";
+        pop(`Reminder set for ticket ${ticket.ticketNumber}`);
+      }
+
+      function cancelTicketReminder(index) {
+        const ticket = tickets[index];
+        if (!ticket) return;
+        delete ticket.ticketReminderAt;
+        save();
+        render();
+      }
+
+      function formatCountdown(milliseconds) {
+        const totalSeconds = Math.max(0, Math.ceil(milliseconds / 1000));
+        const hours = Math.floor(totalSeconds / 3600);
+        const minutes = Math.floor((totalSeconds % 3600) / 60);
+        const seconds = totalSeconds % 60;
+        return `${hours}h ${minutes}m ${seconds}s`;
+      }
+
+      function updateReminderCountdowns() {
+        document.querySelectorAll("[data-reminder-at]").forEach((element) => {
+          const reminderTime = Date.parse(element.dataset.reminderAt);
+          element.textContent = `Reminder in ${formatCountdown(reminderTime - Date.now())}`;
+        });
+      }
+
+      function checkTicketReminders() {
+        const now = Date.now();
+        const dueTickets = [];
+
+        tickets.forEach((ticket) => {
+          if (!ticket.ticketReminderAt || Date.parse(ticket.ticketReminderAt) > now) return;
+          dueTickets.push(ticket.ticketNumber);
+          delete ticket.ticketReminderAt;
+        });
+
+        if (dueTickets.length) {
+          save();
+          render();
+          pop(`Reminder: ${dueTickets.join(", ")}`);
+        }
+      }
+
       function setCategoryFilter(category) {
         activeCategory = category;
         render();
@@ -411,7 +484,11 @@
 
         visibleTickets = visibleTickets.filter((ticket) =>
           matchesCategory(ticket) &&
-          (statusFilter === "All" || ticket.status === statusFilter)
+          (
+            statusFilter === "All" ||
+            (statusFilter === "Open" && ticket.status !== "Closed") ||
+            (statusFilter === "Closed" && ticket.status === "Closed")
+          )
         );
 
         document.querySelectorAll(".stat-filter").forEach((button) => {
@@ -428,7 +505,6 @@
               <td>${ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>
-              <td>${formatDate(ticket.createdAt, { dateStyle: "medium" })}</td>
               <td>${ticket.ticketFrom || "—"}</td>
               <td>${ticket.lastUpdate || "—"}</td>
               <td>${ticket.shortDescription}</td>
@@ -439,7 +515,7 @@
               </td>
             </tr>
             <tr>
-              <td colspan="8">
+              <td colspan="7">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>
@@ -457,6 +533,30 @@
                   ${ticket.notes.map((note) => `
                     <div class="note">${note.date}<br>${note.text}</div>
                   `).join("")}
+                  <div class="reminder">
+                    ${
+                      ticket.ticketReminderAt
+                        ? `
+                          <p data-reminder-at="${ticket.ticketReminderAt}">
+                            Reminder in ${formatCountdown(Date.parse(ticket.ticketReminderAt) - Date.now())}
+                          </p>
+                          <button class="delete-btn" onclick="event.stopPropagation(); cancelTicketReminder(${index})">
+                            Cancel Reminder
+                          </button>
+                        `
+                        : `
+                          <label for="reminder${index}">Set a ticket reminder</label>
+                          <input
+                            id="reminder${index}"
+                            type="datetime-local"
+                            min="${toLocalDateTimeValue(new Date())}"
+                          >
+                          <button class="btn" onclick="event.stopPropagation(); setTicketReminder(${index})">
+                            Set Reminder
+                          </button>
+                        `
+                    }
+                  </div>
                 </div>
               </td>
             </tr>
@@ -474,8 +574,18 @@
           tickets.filter((ticket) => ticket.status === "Closed").length;
       }
 
+      function toLocalDateTimeValue(date) {
+        const localDate = new Date(date.getTime() - date.getTimezoneOffset() * 60 * 1000);
+        return localDate.toISOString().slice(0, 16);
+      }
+
       checkStatusReminders();
       setInterval(checkStatusReminders, 60 * 1000);
+      checkTicketReminders();
+      setInterval(() => {
+        checkTicketReminders();
+        updateReminderCountdowns();
+      }, 1000);
       render();
     </script>
   </body>

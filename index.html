@@ -30,9 +30,18 @@
 
       .stats {
         display: grid;
-        grid-template-columns: repeat(5, 1fr);
+        grid-template-columns: repeat(6, minmax(0, 1fr));
         gap: 10px;
         margin-bottom: 12px;
+      }
+
+      .notification-history-card {
+        min-width: 0;
+      }
+
+      .notification-history-card h2 {
+        margin: 0 0 8px;
+        font-size: 1em;
       }
 
       .stat-filter {
@@ -173,12 +182,19 @@
 
       .notification-history li {
         margin: 8px 0;
+        overflow-wrap: anywhere;
       }
 
       .notification-history time {
         display: block;
         color: #666;
         font-size: 0.85em;
+      }
+
+      @media (max-width: 1000px) {
+        .stats {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
       }
 
       @media (max-width: 600px) {
@@ -225,6 +241,12 @@
         <button type="button" class="stat stat-filter" data-category="Closed" aria-pressed="false" onclick="setCategoryFilter('Closed')">
           Closed: <span id="c">0</span>
         </button>
+        <section class="stat notification-history-card" aria-labelledby="notification-history-heading">
+          <h2 id="notification-history-heading">Notification History</h2>
+          <ol id="notification-history" class="notification-history">
+            <li id="notification-history-empty">No notifications yet.</li>
+          </ol>
+        </section>
       </div>
 
       <div class="card">
@@ -273,12 +295,6 @@
         <tbody id="list"></tbody>
       </table>
 
-      <section class="card" aria-labelledby="notification-history-heading">
-        <h2 id="notification-history-heading">Notification History</h2>
-        <ol id="notification-history" class="notification-history">
-          <li id="notification-history-empty">No notifications yet.</li>
-        </ol>
-      </section>
     </main>
 
     <script>

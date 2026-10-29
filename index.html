@@ -113,6 +113,18 @@
         background: #e2f5e9;
       }
 
+      .table .priority-row-high td {
+        background: #fff0ef;
+      }
+
+      .table .priority-row-medium td {
+        background: #fff9e6;
+      }
+
+      .table .priority-row-low td {
+        background: #edf8f0;
+      }
+
       .table {
         width: 100%;
         border-collapse: collapse;
@@ -647,7 +659,7 @@
         ticketsToRender.forEach((ticket) => {
           const index = tickets.indexOf(ticket);
           ticketList.innerHTML += `
-            <tr onclick="toggle(${index})">
+            <tr class="priority-row-${ticket.priority.toLowerCase()}" onclick="toggle(${index})">
               <td>${ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>

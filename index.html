@@ -243,7 +243,6 @@
       const storageKey = "tickets_v4";
       const reminderInterval = 24 * 60 * 60 * 1000;
       let activeCategory = "All";
-      let notificationTimeout;
       let lastHourlyReminderKey = "";
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
@@ -286,15 +285,10 @@
         const notification = document.getElementById("n");
         document.getElementById("notification-message").textContent = message;
         notification.style.display = "flex";
-        clearTimeout(notificationTimeout);
-        notificationTimeout = setTimeout(() => {
-          dismissNotification();
-        }, 2500);
       }
 
       function dismissNotification() {
         document.getElementById("n").style.display = "none";
-        clearTimeout(notificationTimeout);
       }
 
       function checkHourlyReminder() {

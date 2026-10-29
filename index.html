@@ -281,6 +281,14 @@
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
         </select>
+        <select id="sort-order" aria-label="Sort tickets" onchange="resetTicketList()">
+          <option value="default">Default order</option>
+          <option value="priority-high">Priority: High to Low</option>
+          <option value="priority-low">Priority: Low to High</option>
+          <option value="ticket-ascending">Ticket number: A to Z</option>
+          <option value="ticket-descending">Ticket number: Z to A</option>
+          <option value="updated">Last updated: Newest first</option>
+        </select>
       </div>
 
       <table class="table">
@@ -618,6 +626,33 @@
         return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, options);
       }
 
+      function sortTickets(ticketList, sortOrder) {
+        const priorityRank = { High: 0, Medium: 1, Low: 2 };
+        const originalOrder = new Map(tickets.map((ticket, index) => [ticket, index]));
+
+        return ticketList.sort((first, second) => {
+          if (sortOrder === "priority-high") {
+            return priorityRank[first.priority] - priorityRank[second.priority];
+          }
+          if (sortOrder === "priority-low") {
+            return priorityRank[second.priority] - priorityRank[first.priority];
+          }
+          if (sortOrder === "ticket-ascending") {
+            return first.ticketNumber.localeCompare(second.ticketNumber, undefined, { numeric: true });
+          }
+          if (sortOrder === "ticket-descending") {
+            return second.ticketNumber.localeCompare(first.ticketNumber, undefined, { numeric: true });
+          }
+          if (sortOrder === "updated") {
+            const firstUpdatedAt = Date.parse(first.lastUpdate);
+            const secondUpdatedAt = Date.parse(second.lastUpdate);
+            return (Number.isNaN(secondUpdatedAt) ? 0 : secondUpdatedAt) -
+              (Number.isNaN(firstUpdatedAt) ? 0 : firstUpdatedAt);
+          }
+          return originalOrder.get(first) - originalOrder.get(second);
+        });
+      }
+
       function deleteTicket(index) {
         const ticket = tickets[index];
         if (!ticket) return;
@@ -632,6 +667,7 @@
       function render() {
         const searchTerm = document.getElementById("search").value.toLowerCase();
         const statusFilter = document.getElementById("status-filter").value;
+        const sortOrder = document.getElementById("sort-order").value;
         let visibleTickets = tickets.filter((ticket) =>
           ticket.ticketNumber.toLowerCase().includes(searchTerm)
         );
@@ -644,6 +680,8 @@
             (statusFilter === "Closed" && ticket.status === "Closed")
           )
         );
+
+        visibleTickets = sortTickets(visibleTickets, sortOrder);
 
         document.querySelectorAll(".stat-filter").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));

@@ -509,7 +509,10 @@
 
       function toggle(index) {
         const detail = document.getElementById(`d${index}`);
-        detail.style.display = detail.style.display === "block" ? "none" : "block";
+        const detailRow = document.getElementById(`detail-row-${index}`);
+        const isOpen = !detailRow.hidden;
+        detailRow.hidden = isOpen;
+        detail.style.display = isOpen ? "none" : "block";
       }
 
       function addNote(index) {
@@ -601,6 +604,7 @@
         ticket.ticketReminderAt = new Date(reminderTime).toISOString();
         save();
         render();
+        document.getElementById(`detail-row-${index}`).hidden = false;
         document.getElementById(`d${index}`).style.display = "block";
         pop(`Reminder set for ticket ${ticket.ticketNumber}`);
       }
@@ -837,7 +841,7 @@
                 </button>
               </td>
             </tr>
-            <tr>
+            <tr id="detail-row-${index}" hidden>
               <td colspan="9">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">

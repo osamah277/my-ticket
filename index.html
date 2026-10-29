@@ -89,6 +89,30 @@
         cursor: pointer;
       }
 
+      .priority-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 999px;
+        font-size: 0.875rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .priority-high {
+        color: #8f1d14;
+        background: #fde8e7;
+      }
+
+      .priority-medium {
+        color: #755300;
+        background: #fff3c4;
+      }
+
+      .priority-low {
+        color: #176b3a;
+        background: #e2f5e9;
+      }
+
       .table {
         width: 100%;
         border-collapse: collapse;
@@ -229,6 +253,12 @@
             <option>Closed</option>
           </select>
         </div>
+        <label for="priority">Priority</label>
+        <select id="priority">
+          <option value="High">High (Red)</option>
+          <option value="Medium" selected>Medium (Yellow)</option>
+          <option value="Low">Low (Green)</option>
+        </select>
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
 
@@ -247,6 +277,7 @@
             <th>Ticket #</th>
             <th>Customer</th>
             <th>Status</th>
+            <th>Priority</th>
             <th>Ticket From</th>
             <th>Last Updated</th>
             <th>Description</th>
@@ -274,6 +305,9 @@
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
           if (cleanedTicket.status === "Open") cleanedTicket.status = "Assigned";
+          if (!["High", "Medium", "Low"].includes(cleanedTicket.priority)) {
+            cleanedTicket.priority = "Medium";
+          }
           if (
             needsStatusReminder(cleanedTicket.status) &&
             Number.isNaN(Date.parse(cleanedTicket.nextStatusReminderAt))
@@ -385,6 +419,7 @@
           shortDescription: document.getElementById("sd").value,
           assignedDate: document.getElementById("ad").value,
           status: document.getElementById("st").value,
+          priority: document.getElementById("priority").value,
           createdAt: new Date().toISOString(),
           lastUpdate: new Date().toLocaleString(),
           notes: [],
@@ -399,6 +434,7 @@
           document.getElementById(id).value = "";
         });
         document.getElementById("st").value = "Assigned";
+        document.getElementById("priority").value = "Medium";
         render();
         pop("Ticket Created");
       }
@@ -432,6 +468,24 @@
         }
         save();
         render();
+      }
+
+      function priorityChange(index, priority) {
+        if (tickets[index].priority === priority) return;
+        if (!["High", "Medium", "Low"].includes(priority)) {
+          pop("Choose a valid ticket priority");
+          render();
+          return;
+        }
+
+        tickets[index].priority = priority;
+        tickets[index].lastUpdate = new Date().toLocaleString();
+        save();
+        render();
+      }
+
+      function priorityClass(priority) {
+        return `priority-${priority.toLowerCase()}`;
       }
 
       function checkStatusReminders() {
@@ -597,6 +651,7 @@
               <td>${ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>
+              <td><span class="priority-badge ${priorityClass(ticket.priority)}">${ticket.priority}</span></td>
               <td>${ticket.ticketFrom || "—"}</td>
               <td>${ticket.lastUpdate || "—"}</td>
               <td>${ticket.shortDescription}</td>
@@ -607,7 +662,7 @@
               </td>
             </tr>
             <tr>
-              <td colspan="7">
+              <td colspan="8">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>
@@ -617,6 +672,12 @@
                     <option>Pending Vendor</option>
                     <option>Resolved</option>
                     <option>Closed</option>
+                  </select>
+                  <label for="ticket-priority-${index}">Priority</label>
+                  <select id="ticket-priority-${index}" onchange="priorityChange(${index}, this.value)">
+                    <option value="High" ${ticket.priority === "High" ? "selected" : ""}>High (Red)</option>
+                    <option value="Medium" ${ticket.priority === "Medium" ? "selected" : ""}>Medium (Yellow)</option>
+                    <option value="Low" ${ticket.priority === "Low" ? "selected" : ""}>Low (Green)</option>
                   </select>
                   <textarea id="note${index}" placeholder="Add note"></textarea>
                   <button class="btn" onclick="event.stopPropagation(); addNote(${index})">

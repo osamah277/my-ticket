@@ -30,18 +30,9 @@
 
       .stats {
         display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(5, 1fr);
         gap: 10px;
         margin-bottom: 12px;
-      }
-
-      .notification-history-card {
-        min-width: 0;
-      }
-
-      .notification-history-card h2 {
-        margin: 0 0 8px;
-        font-size: 1em;
       }
 
       .stat-filter {
@@ -173,30 +164,6 @@
         cursor: pointer;
       }
 
-      .notification-history {
-        max-height: 240px;
-        margin: 0;
-        padding-left: 24px;
-        overflow-y: auto;
-      }
-
-      .notification-history li {
-        margin: 8px 0;
-        overflow-wrap: anywhere;
-      }
-
-      .notification-history time {
-        display: block;
-        color: #666;
-        font-size: 0.85em;
-      }
-
-      @media (max-width: 1000px) {
-        .stats {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-      }
-
       @media (max-width: 600px) {
         body {
           margin: 12px;
@@ -223,7 +190,7 @@
       </section>
     </div>
     <main id="app-content">
-      <h1>Ticket Dashboard V4</h1>
+      <h1>Ticket Dashboard V1</h1>
 
       <div class="stats">
         <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
@@ -241,12 +208,6 @@
         <button type="button" class="stat stat-filter" data-category="Closed" aria-pressed="false" onclick="setCategoryFilter('Closed')">
           Closed: <span id="c">0</span>
         </button>
-        <section class="stat notification-history-card" aria-labelledby="notification-history-heading">
-          <h2 id="notification-history-heading">Notification History</h2>
-          <ol id="notification-history" class="notification-history">
-            <li id="notification-history-empty">No notifications yet.</li>
-          </ol>
-        </section>
       </div>
 
       <div class="card">
@@ -342,18 +303,6 @@
       }
 
       function pop(message) {
-        const history = document.getElementById("notification-history");
-        document.getElementById("notification-history-empty")?.remove();
-
-        const historyItem = document.createElement("li");
-        const timestamp = document.createElement("time");
-        timestamp.dateTime = new Date().toISOString();
-        timestamp.textContent = new Date().toLocaleString();
-        const notificationText = document.createElement("span");
-        notificationText.textContent = message;
-        historyItem.append(timestamp, notificationText);
-        history.prepend(historyItem);
-
         if (document.getElementById("n").style.display === "flex") {
           notificationQueue.push(message);
           return;

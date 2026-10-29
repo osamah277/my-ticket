@@ -133,11 +133,22 @@
         top: 10px;
         left: 50%;
         display: none;
+        align-items: center;
+        gap: 12px;
         padding: 10px;
         transform: translateX(-50%);
         border-radius: 8px;
         color: #fff;
         background: #4a90e2;
+      }
+
+      .notif button {
+        padding: 4px 8px;
+        border: 1px solid currentColor;
+        border-radius: 4px;
+        color: inherit;
+        background: transparent;
+        cursor: pointer;
       }
 
       @media (max-width: 600px) {
@@ -158,7 +169,10 @@
     </style>
   </head>
   <body>
-    <div id="n" class="notif"></div>
+    <div id="n" class="notif" role="status" aria-live="polite">
+      <span id="notification-message"></span>
+      <button type="button" onclick="dismissNotification()">Okay</button>
+    </div>
     <h1>Ticket Dashboard V4</h1>
 
     <div class="stats">
@@ -229,6 +243,8 @@
       const storageKey = "tickets_v4";
       const reminderInterval = 24 * 60 * 60 * 1000;
       let activeCategory = "All";
+      let notificationTimeout;
+      let lastHourlyReminderKey = "";
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -268,11 +284,32 @@
 
       function pop(message) {
         const notification = document.getElementById("n");
-        notification.innerText = message;
-        notification.style.display = "block";
-        setTimeout(() => {
-          notification.style.display = "none";
+        document.getElementById("notification-message").textContent = message;
+        notification.style.display = "flex";
+        clearTimeout(notificationTimeout);
+        notificationTimeout = setTimeout(() => {
+          dismissNotification();
         }, 2500);
+      }
+
+      function dismissNotification() {
+        document.getElementById("n").style.display = "none";
+        clearTimeout(notificationTimeout);
+      }
+
+      function checkHourlyReminder() {
+        const now = new Date();
+        if (now.getHours() < 7 || now.getHours() > 15 || now.getMinutes() !== 0) return;
+
+        const activeTickets = tickets.filter((ticket) => ticket.status !== "Closed");
+        if (!activeTickets.length) return;
+
+        const reminderKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
+        if (reminderKey === lastHourlyReminderKey) return;
+
+        lastHourlyReminderKey = reminderKey;
+        const ticketNumbers = activeTickets.map((ticket) => ticket.ticketNumber).join(", ");
+        pop(`Hourly reminder: check active tickets ${ticketNumbers}`);
       }
 
       function nextId() {
@@ -586,6 +623,8 @@
         checkTicketReminders();
         updateReminderCountdowns();
       }, 1000);
+      checkHourlyReminder();
+      setInterval(checkHourlyReminder, 15 * 1000);
       render();
     </script>
   </body>

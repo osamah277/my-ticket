@@ -338,8 +338,14 @@
                 <option>Low</option>
               </select>
             </th>
-            <th><input id="filter-ticket-from" aria-label="Filter by ticket from" placeholder="Filter..." oninput="resetTicketList()"></th>
-            <th><input id="filter-last-updated" aria-label="Filter by last updated" placeholder="Filter..." oninput="resetTicketList()"></th>
+            <th>
+              <select id="filter-ticket-from" aria-label="Filter by ticket from" onchange="resetTicketList()">
+                <option value="">All sources</option>
+                <option value="AM">AM</option>
+                <option value="PS">PS</option>
+              </select>
+            </th>
+            <th><input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()"></th>
             <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
             <th></th>
             <th></th>
@@ -668,17 +674,32 @@
         return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString(undefined, options);
       }
 
+      function matchesLocalDate(value, dateValue) {
+        if (!dateValue) return true;
+        const date = new Date(value);
+        if (Number.isNaN(date.getTime())) return false;
+
+        const localDateValue = [
+          date.getFullYear(),
+          String(date.getMonth() + 1).padStart(2, "0"),
+          String(date.getDate()).padStart(2, "0"),
+        ].join("-");
+        return localDateValue === dateValue;
+      }
+
       function getVisibleTickets() {
         const filterText = (id) => document.getElementById(id).value.trim().toLowerCase();
         const filterStatus = document.getElementById("filter-status").value;
         const filterPriority = document.getElementById("filter-priority").value;
+        const filterTicketFrom = document.getElementById("filter-ticket-from").value;
+        const filterLastUpdated = document.getElementById("filter-last-updated").value;
         return tickets.filter((ticket) =>
           ticket.ticketNumber.toLowerCase().includes(filterText("filter-ticket-number")) &&
           (ticket.customerName || "").toLowerCase().includes(filterText("filter-customer")) &&
           (!filterStatus || ticket.status === filterStatus) &&
           (!filterPriority || ticket.priority === filterPriority) &&
-          (ticket.ticketFrom || "").toLowerCase().includes(filterText("filter-ticket-from")) &&
-          (ticket.lastUpdate || "").toLowerCase().includes(filterText("filter-last-updated")) &&
+          (!filterTicketFrom || (ticket.ticketFrom || "").trim().toUpperCase() === filterTicketFrom) &&
+          matchesLocalDate(ticket.lastUpdate, filterLastUpdated) &&
           (ticket.shortDescription || "").toLowerCase().includes(filterText("filter-description")) &&
           matchesCategory(ticket)
         );

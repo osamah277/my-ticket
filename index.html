@@ -130,25 +130,55 @@
 
       .notif {
         position: fixed;
-        top: 10px;
-        left: 50%;
         display: none;
         align-items: center;
-        gap: 12px;
+        justify-content: center;
+        z-index: 1000;
+        inset: 0;
+        padding: 20px;
+        background: rgb(0 0 0 / 45%);
+      }
+
+      .notif-dialog {
+        width: min(100%, 420px);
         padding: 10px;
-        transform: translateX(-50%);
         border-radius: 8px;
-        color: #fff;
-        background: #4a90e2;
+        background: #fff;
+        box-shadow: 0 8px 32px rgb(0 0 0 / 25%);
+      }
+
+      .notif-dialog h2 {
+        margin: 0 0 10px;
+      }
+
+      .notif-dialog p {
+        overflow-wrap: anywhere;
       }
 
       .notif button {
-        padding: 4px 8px;
-        border: 1px solid currentColor;
-        border-radius: 4px;
-        color: inherit;
-        background: transparent;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 6px;
+        color: #fff;
+        background: #4a90e2;
         cursor: pointer;
+      }
+
+      .notification-history {
+        max-height: 240px;
+        margin: 0;
+        padding-left: 24px;
+        overflow-y: auto;
+      }
+
+      .notification-history li {
+        margin: 8px 0;
+      }
+
+      .notification-history time {
+        display: block;
+        color: #666;
+        font-size: 0.85em;
       }
 
       @media (max-width: 600px) {
@@ -169,81 +199,95 @@
     </style>
   </head>
   <body>
-    <div id="n" class="notif" role="status" aria-live="polite">
-      <span id="notification-message"></span>
-      <button type="button" onclick="dismissNotification()">Okay</button>
+    <div id="n" class="notif">
+      <section class="notif-dialog" role="dialog" aria-modal="true" aria-labelledby="notification-title" aria-describedby="notification-message">
+        <h2 id="notification-title">Notification</h2>
+        <p id="notification-message"></p>
+        <button type="button" onclick="dismissNotification()">Okay</button>
+      </section>
     </div>
-    <h1>Ticket Dashboard V4</h1>
+    <main id="app-content">
+      <h1>Ticket Dashboard V4</h1>
 
-    <div class="stats">
-      <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
-        Total: <span id="t">0</span>
-      </button>
-      <button type="button" class="stat stat-filter" data-category="Active" aria-pressed="false" onclick="setCategoryFilter('Active')">
-        Active: <span id="o">0</span>
-      </button>
-      <button type="button" class="stat stat-filter" data-category="In Progress" aria-pressed="false" onclick="setCategoryFilter('In Progress')">
-        In Progress: <span id="i">0</span>
-      </button>
-      <button type="button" class="stat stat-filter" data-category="Pending" aria-pressed="false" onclick="setCategoryFilter('Pending')">
-        Pending: <span id="p">0</span>
-      </button>
-      <button type="button" class="stat stat-filter" data-category="Closed" aria-pressed="false" onclick="setCategoryFilter('Closed')">
-        Closed: <span id="c">0</span>
-      </button>
-    </div>
-
-    <div class="card">
-      <h3>Create Ticket</h3>
-      <div class="row">
-        <input id="tn" placeholder="Ticket Number (leave blank for auto)">
-        <input id="cn" placeholder="Customer Name">
+      <div class="stats">
+        <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
+          Total: <span id="t">0</span>
+        </button>
+        <button type="button" class="stat stat-filter" data-category="Active" aria-pressed="false" onclick="setCategoryFilter('Active')">
+          Active: <span id="o">0</span>
+        </button>
+        <button type="button" class="stat stat-filter" data-category="In Progress" aria-pressed="false" onclick="setCategoryFilter('In Progress')">
+          In Progress: <span id="i">0</span>
+        </button>
+        <button type="button" class="stat stat-filter" data-category="Pending" aria-pressed="false" onclick="setCategoryFilter('Pending')">
+          Pending: <span id="p">0</span>
+        </button>
+        <button type="button" class="stat stat-filter" data-category="Closed" aria-pressed="false" onclick="setCategoryFilter('Closed')">
+          Closed: <span id="c">0</span>
+        </button>
       </div>
-      <input id="tf" placeholder="Ticket From">
-      <input id="sd" placeholder="Short Description">
-      <div class="row">
-        <input type="date" id="ad">
-        <select id="st">
-          <option>Assigned</option>
-          <option>In Progress</option>
-          <option>Pending Customer</option>
-          <option>Pending Vendor</option>
-          <option>Resolved</option>
-          <option>Closed</option>
+
+      <div class="card">
+        <h3>Create Ticket</h3>
+        <div class="row">
+          <input id="tn" placeholder="Ticket Number (leave blank for auto)">
+          <input id="cn" placeholder="Customer Name">
+        </div>
+        <input id="tf" placeholder="Ticket From">
+        <input id="sd" placeholder="Short Description">
+        <div class="row">
+          <input type="date" id="ad">
+          <select id="st">
+            <option>Assigned</option>
+            <option>In Progress</option>
+            <option>Pending Customer</option>
+            <option>Pending Vendor</option>
+            <option>Resolved</option>
+            <option>Closed</option>
+          </select>
+        </div>
+        <button class="btn" onclick="createTicket()">Create Ticket</button>
+      </div>
+
+      <div class="toolbar">
+        <input id="search" placeholder="Search Ticket #" onkeyup="render()">
+        <select id="status-filter" aria-label="Filter by status" onchange="render()">
+          <option value="Open">Open</option>
+          <option value="All" selected>All</option>
+          <option value="Closed">Closed</option>
         </select>
       </div>
-      <button class="btn" onclick="createTicket()">Create Ticket</button>
-    </div>
 
-    <div class="toolbar">
-      <input id="search" placeholder="Search Ticket #" onkeyup="render()">
-      <select id="status-filter" aria-label="Filter by status" onchange="render()">
-        <option value="Open">Open</option>
-        <option value="All" selected>All</option>
-        <option value="Closed">Closed</option>
-      </select>
-    </div>
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Ticket #</th>
+            <th>Customer</th>
+            <th>Status</th>
+            <th>Ticket From</th>
+            <th>Last Updated</th>
+            <th>Description</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="list"></tbody>
+      </table>
 
-    <table class="table">
-      <thead>
-        <tr>
-          <th>Ticket #</th>
-          <th>Customer</th>
-          <th>Status</th>
-          <th>Ticket From</th>
-          <th>Last Updated</th>
-          <th>Description</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody id="list"></tbody>
-    </table>
+      <section class="card" aria-labelledby="notification-history-heading">
+        <h2 id="notification-history-heading">Notification History</h2>
+        <ol id="notification-history" class="notification-history">
+          <li id="notification-history-empty">No notifications yet.</li>
+        </ol>
+      </section>
+    </main>
 
     <script>
       const storageKey = "tickets_v4";
       const reminderInterval = 24 * 60 * 60 * 1000;
       let activeCategory = "All";
       let lastHourlyReminderKey = "";
+      let notificationQueue = [];
+      let previousFocus = null;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -282,13 +326,46 @@
       }
 
       function pop(message) {
-        const notification = document.getElementById("n");
+        const history = document.getElementById("notification-history");
+        document.getElementById("notification-history-empty")?.remove();
+
+        const historyItem = document.createElement("li");
+        const timestamp = document.createElement("time");
+        timestamp.dateTime = new Date().toISOString();
+        timestamp.textContent = new Date().toLocaleString();
+        const notificationText = document.createElement("span");
+        notificationText.textContent = message;
+        historyItem.append(timestamp, notificationText);
+        history.prepend(historyItem);
+
+        if (document.getElementById("n").style.display === "flex") {
+          notificationQueue.push(message);
+          return;
+        }
+
+        previousFocus = document.activeElement;
+        showNotification(message);
+      }
+
+      function showNotification(message) {
         document.getElementById("notification-message").textContent = message;
-        notification.style.display = "flex";
+        document.getElementById("app-content").inert = true;
+        document.getElementById("n").style.display = "flex";
+        document.querySelector(".notif-dialog button").focus();
       }
 
       function dismissNotification() {
+        if (notificationQueue.length > 0) {
+          showNotification(notificationQueue.shift());
+          return;
+        }
+
         document.getElementById("n").style.display = "none";
+        document.getElementById("app-content").inert = false;
+        if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
+          previousFocus.focus();
+        }
+        previousFocus = null;
       }
 
       function checkHourlyReminder() {

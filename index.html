@@ -157,6 +157,13 @@
         background: #dce6f1;
       }
 
+      .column-filters input,
+      .column-filters select {
+        min-width: 90px;
+        margin: 0;
+        padding: 6px;
+      }
+
       .table th,
       .table td {
         padding: 10px;
@@ -296,15 +303,6 @@
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
 
-      <div class="toolbar">
-        <input id="search" placeholder="Search Ticket #" oninput="resetTicketList()">
-        <select id="status-filter" aria-label="Filter by status" onchange="resetTicketList()">
-          <option value="Open">Open</option>
-          <option value="All" selected>All</option>
-          <option value="Closed">Closed</option>
-        </select>
-      </div>
-
       <table class="table">
         <thead>
           <tr>
@@ -317,6 +315,34 @@
             <th>Description</th>
             <th>Order</th>
             <th>Actions</th>
+          </tr>
+          <tr class="column-filters">
+            <th><input id="filter-ticket-number" aria-label="Filter by ticket number" placeholder="Filter..." oninput="resetTicketList()"></th>
+            <th><input id="filter-customer" aria-label="Filter by customer" placeholder="Filter..." oninput="resetTicketList()"></th>
+            <th>
+              <select id="filter-status" aria-label="Filter by status" onchange="resetTicketList()">
+                <option value="">All statuses</option>
+                <option>Assigned</option>
+                <option>In Progress</option>
+                <option>Pending Customer</option>
+                <option>Pending Vendor</option>
+                <option>Resolved</option>
+                <option>Closed</option>
+              </select>
+            </th>
+            <th>
+              <select id="filter-priority" aria-label="Filter by priority" onchange="resetTicketList()">
+                <option value="">All priorities</option>
+                <option>High</option>
+                <option>Medium</option>
+                <option>Low</option>
+              </select>
+            </th>
+            <th><input id="filter-ticket-from" aria-label="Filter by ticket from" placeholder="Filter..." oninput="resetTicketList()"></th>
+            <th><input id="filter-last-updated" aria-label="Filter by last updated" placeholder="Filter..." oninput="resetTicketList()"></th>
+            <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
+            <th></th>
+            <th></th>
           </tr>
         </thead>
         <tbody id="list"></tbody>
@@ -643,16 +669,18 @@
       }
 
       function getVisibleTickets() {
-        const searchTerm = document.getElementById("search").value.toLowerCase();
-        const statusFilter = document.getElementById("status-filter").value;
+        const filterText = (id) => document.getElementById(id).value.trim().toLowerCase();
+        const filterStatus = document.getElementById("filter-status").value;
+        const filterPriority = document.getElementById("filter-priority").value;
         return tickets.filter((ticket) =>
-          ticket.ticketNumber.toLowerCase().includes(searchTerm) &&
-          matchesCategory(ticket) &&
-          (
-            statusFilter === "All" ||
-            (statusFilter === "Open" && ticket.status !== "Closed") ||
-            (statusFilter === "Closed" && ticket.status === "Closed")
-          )
+          ticket.ticketNumber.toLowerCase().includes(filterText("filter-ticket-number")) &&
+          (ticket.customerName || "").toLowerCase().includes(filterText("filter-customer")) &&
+          (!filterStatus || ticket.status === filterStatus) &&
+          (!filterPriority || ticket.priority === filterPriority) &&
+          (ticket.ticketFrom || "").toLowerCase().includes(filterText("filter-ticket-from")) &&
+          (ticket.lastUpdate || "").toLowerCase().includes(filterText("filter-last-updated")) &&
+          (ticket.shortDescription || "").toLowerCase().includes(filterText("filter-description")) &&
+          matchesCategory(ticket)
         );
       }
 

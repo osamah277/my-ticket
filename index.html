@@ -125,19 +125,10 @@
         background: #edf8f0;
       }
 
-      .move-btn {
-        min-width: 32px;
-        margin: 0 2px;
-        padding: 5px 8px;
-        border: 1px solid #b8c5d3;
-        border-radius: 4px;
-        background: #fff;
-        cursor: pointer;
-      }
-
-      .move-btn:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
+      .position-input {
+        width: 4.5em;
+        margin: 0;
+        text-align: center;
       }
 
       .table {
@@ -296,7 +287,7 @@
           <option value="All" selected>All</option>
           <option value="Closed">Closed</option>
         </select>
-        <span>Use the arrows to change ticket order.</span>
+        <span>Set a ticket's position: 1 is the top; 99 moves it to the bottom.</span>
       </div>
 
       <table class="table">
@@ -649,14 +640,25 @@
         );
       }
 
-      function moveTicket(index, direction) {
+      function moveTicketToPosition(index, requestedPosition) {
         const visibleTickets = getVisibleTickets();
         const currentPosition = visibleTickets.indexOf(tickets[index]);
-        const targetTicket = visibleTickets[currentPosition + direction];
-        if (!targetTicket) return;
+        const position = Number(requestedPosition);
+        if (!Number.isInteger(position) || position < 1 || position > 99) {
+          pop("Enter a position from 1 to 99");
+          render();
+          return;
+        }
 
+        const targetPosition = Math.min(position, visibleTickets.length) - 1;
+        if (currentPosition < 0 || targetPosition === currentPosition) return;
+
+        const ticket = tickets[index];
+        const targetTicket = visibleTickets[targetPosition];
+        tickets.splice(index, 1);
         const targetIndex = tickets.indexOf(targetTicket);
-        [tickets[index], tickets[targetIndex]] = [tickets[targetIndex], tickets[index]];
+        const insertionIndex = targetIndex + (currentPosition < targetPosition ? 1 : 0);
+        tickets.splice(insertionIndex, 0, ticket);
         save();
         render();
       }
@@ -701,22 +703,17 @@
               <td>${ticket.lastUpdate || "—"}</td>
               <td>${ticket.shortDescription}</td>
               <td>
-                <button
-                  class="move-btn"
-                  type="button"
-                  aria-label="Move ${ticket.ticketNumber} up"
-                  title="Move up"
-                  ${visiblePosition === 0 ? "disabled" : ""}
-                  onclick="event.stopPropagation(); moveTicket(${index}, -1)"
-                >↑</button>
-                <button
-                  class="move-btn"
-                  type="button"
-                  aria-label="Move ${ticket.ticketNumber} down"
-                  title="Move down"
-                  ${visiblePosition === visibleTickets.length - 1 ? "disabled" : ""}
-                  onclick="event.stopPropagation(); moveTicket(${index}, 1)"
-                >↓</button>
+                <input
+                  class="position-input"
+                  type="number"
+                  min="1"
+                  max="99"
+                  value="${visiblePosition + 1}"
+                  aria-label="Position for ticket ${ticket.ticketNumber}"
+                  title="1 is the top; 99 moves to the bottom"
+                  onchange="event.stopPropagation(); moveTicketToPosition(${index}, this.value)"
+                  onclick="event.stopPropagation()"
+                >
               </td>
               <td>
                 <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">

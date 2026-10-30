@@ -197,8 +197,8 @@
         border-bottom: 4px solid #f5f7fa;
       }
 
-      .table.profile-osamah th:nth-child(5),
-      .table.profile-osamah td:nth-child(5) {
+      .table.profile-steven th:nth-child(5),
+      .table.profile-steven td:nth-child(5) {
         display: none;
       }
 
@@ -521,9 +521,6 @@
         if (profile !== "osamah" && profile !== "steven") return;
         activeProfile = profile;
         localStorage.setItem(profileStorageKey, profile);
-        if (profile === "osamah") {
-          document.getElementById("filter-ticket-from").value = "";
-        }
         document.getElementById("settings-panel").hidden = true;
         document.querySelector(".settings-button").setAttribute("aria-expanded", "false");
         render();

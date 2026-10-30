@@ -16,6 +16,58 @@
         font-family: Segoe UI, Arial, sans-serif;
       }
 
+      .page-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .page-header h1 {
+        margin: 0.67em 0;
+      }
+
+      .settings-menu {
+        position: relative;
+      }
+
+      .settings-button {
+        padding: 8px 10px;
+        border: 1px solid #d3dce6;
+        border-radius: 6px;
+        color: #333;
+        background: #fff;
+        font-size: 1.25rem;
+        cursor: pointer;
+      }
+
+      .settings-panel {
+        position: absolute;
+        top: calc(100% + 6px);
+        right: 0;
+        z-index: 10;
+        min-width: 190px;
+        padding: 8px;
+        border: 1px solid #d3dce6;
+        border-radius: 8px;
+        background: #fff;
+        box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
+      }
+
+      .settings-panel button {
+        width: 100%;
+        padding: 8px;
+        border: 0;
+        border-radius: 4px;
+        background: transparent;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .settings-panel button:hover,
+      .settings-panel button[aria-pressed="true"] {
+        background: #e8f2ff;
+      }
+
       .card,
       .stat {
         padding: 12px;
@@ -139,6 +191,15 @@
 
       .table .priority-row-low:hover td {
         background: #8bc49b;
+      }
+
+      .table.profile-osamah .ticket-row td {
+        border-bottom: 4px solid #f5f7fa;
+      }
+
+      .table.profile-osamah th:nth-child(5),
+      .table.profile-osamah td:nth-child(5) {
+        display: none;
       }
 
       .position-input {
@@ -271,7 +332,27 @@
       </section>
     </div>
     <main id="app-content">
-      <h1>Ticket Dashboard V1</h1>
+      <header class="page-header">
+        <h1>Ticket Dashboard V1</h1>
+        <div class="settings-menu">
+          <button
+            class="settings-button"
+            type="button"
+            aria-label="Settings"
+            aria-expanded="false"
+            aria-controls="settings-panel"
+            onclick="toggleSettings()"
+          >&#9881;</button>
+          <div class="settings-panel" id="settings-panel" hidden>
+            <button type="button" data-profile="osamah" aria-pressed="false" onclick="setProfile('osamah')">
+              Osamah Settings
+            </button>
+            <button type="button" data-profile="steven" aria-pressed="true" onclick="setProfile('steven')">
+              Steven Settings (Default)
+            </button>
+          </div>
+        </div>
+      </header>
 
       <div class="stats">
         <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
@@ -320,7 +401,7 @@
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
 
-      <table class="table">
+      <table class="table profile-steven" id="ticket-table">
         <thead>
           <tr>
             <th>Ticket #</th>
@@ -378,9 +459,11 @@
 
     <script>
       const storageKey = "tickets_v4";
+      const profileStorageKey = "ticket_dashboard_profile";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const reminderInterval = 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
+      let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
       let activeCategory = "All";
       let visibleTicketLimit = ticketPageSize;
       let lastHourlyReminderKey = "";
@@ -425,6 +508,25 @@
 
       function needsStatusReminder(status) {
         return status === "Assigned" || status === "In Progress";
+      }
+
+      function toggleSettings() {
+        const panel = document.getElementById("settings-panel");
+        const isOpen = panel.hidden;
+        panel.hidden = !isOpen;
+        document.querySelector(".settings-button").setAttribute("aria-expanded", String(isOpen));
+      }
+
+      function setProfile(profile) {
+        if (profile !== "osamah" && profile !== "steven") return;
+        activeProfile = profile;
+        localStorage.setItem(profileStorageKey, profile);
+        if (profile === "osamah") {
+          document.getElementById("filter-ticket-from").value = "";
+        }
+        document.getElementById("settings-panel").hidden = true;
+        document.querySelector(".settings-button").setAttribute("aria-expanded", "false");
+        render();
       }
 
       function pop(message, linkedTickets = []) {
@@ -878,6 +980,11 @@
       function render() {
         const visibleTickets = getVisibleTickets();
 
+        document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
+        document.querySelectorAll(".settings-panel [data-profile]").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.profile === activeProfile));
+        });
+
         document.querySelectorAll(".stat-filter").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));
         });
@@ -932,7 +1039,7 @@
               </td>
             </tr>
             <tr id="detail-row-${index}" hidden>
-              <td colspan="9">
+              <td colspan="${activeProfile === "osamah" ? 8 : 9}">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>

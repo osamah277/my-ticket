@@ -426,18 +426,32 @@
         return status === "Assigned" || status === "In Progress";
       }
 
-      function pop(message) {
+      function pop(message, linkedTickets = []) {
+        const notification = { message, linkedTickets };
         if (document.getElementById("n").style.display === "flex") {
-          notificationQueue.push(message);
+          notificationQueue.push(notification);
           return;
         }
 
         previousFocus = document.activeElement;
-        showNotification(message);
+        showNotification(notification);
       }
 
-      function showNotification(message) {
-        document.getElementById("notification-message").textContent = message;
+      function showNotification(notification) {
+        const messageElement = document.getElementById("notification-message");
+        messageElement.textContent = notification.message;
+        notification.linkedTickets.forEach((ticket) => {
+          const ticketLink = normalizeTicketLink(ticket.ticketLink);
+          if (!ticketLink) return;
+
+          const link = document.createElement("a");
+          link.href = ticketLink;
+          link.target = "_blank";
+          link.rel = "noopener noreferrer";
+          link.textContent = `Open ticket ${ticket.ticketNumber}`;
+          link.addEventListener("click", (event) => event.stopPropagation());
+          messageElement.append(document.createElement("br"), link);
+        });
         document.getElementById("app-content").inert = true;
         document.getElementById("n").style.display = "flex";
         document.querySelector(".notif-dialog button").focus();
@@ -469,7 +483,7 @@
 
         lastHourlyReminderKey = reminderKey;
         const ticketNumbers = activeTickets.map((ticket) => ticket.ticketNumber).join(", ");
-        pop(`Hourly reminder: check active tickets ${ticketNumbers}`);
+        pop(`Hourly reminder: check active tickets ${ticketNumbers}`, activeTickets);
       }
 
       function nextId() {
@@ -617,7 +631,7 @@
           if (Number.isNaN(nextReminder)) {
             nextReminder = now + reminderInterval;
           } else if (nextReminder <= now) {
-            dueTickets.push(ticket.ticketNumber);
+            dueTickets.push(ticket);
             do {
               nextReminder += reminderInterval;
             } while (nextReminder <= now);
@@ -630,7 +644,8 @@
 
         if (dueTickets.length) {
           save();
-          pop(`Reminder: ${dueTickets.join(", ")} ${dueTickets.length === 1 ? "is" : "are"} still Assigned or In Progress`);
+          const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
+          pop(`Reminder: ${ticketNumbers} ${dueTickets.length === 1 ? "is" : "are"} still Assigned or In Progress`, dueTickets);
         }
       }
 
@@ -653,7 +668,7 @@
         render();
         document.getElementById(`detail-row-${index}`).hidden = false;
         document.getElementById(`d${index}`).style.display = "block";
-        pop(`Reminder set for ticket ${ticket.ticketNumber}`);
+        pop(`Reminder set for ticket ${ticket.ticketNumber}`, [ticket]);
       }
 
       function cancelTicketReminder(index) {
@@ -685,14 +700,15 @@
 
         tickets.forEach((ticket) => {
           if (!ticket.ticketReminderAt || Date.parse(ticket.ticketReminderAt) > now) return;
-          dueTickets.push(ticket.ticketNumber);
+          dueTickets.push(ticket);
           delete ticket.ticketReminderAt;
         });
 
         if (dueTickets.length) {
           save();
           render();
-          pop(`Reminder: ${dueTickets.join(", ")}`);
+          const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
+          pop(`Reminder: ${ticketNumbers}`, dueTickets);
         }
       }
 

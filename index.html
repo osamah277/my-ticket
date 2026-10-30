@@ -163,6 +163,99 @@
         background: #242b36;
       }
 
+      .color-blind-mode .table .priority-row-high td {
+        background: #f5d6b8;
+      }
+
+      .color-blind-mode .table .priority-row-medium td {
+        background: #cfe3f8;
+      }
+
+      .color-blind-mode .table .priority-row-low td {
+        background: #e2e5e9;
+      }
+
+      .color-blind-mode .table .priority-row-high:hover td {
+        background: #e9b98e;
+      }
+
+      .color-blind-mode .table .priority-row-medium:hover td {
+        background: #a9cbea;
+      }
+
+      .color-blind-mode .table .priority-row-low:hover td {
+        background: #c4cbd3;
+      }
+
+      .color-blind-mode .priority-high {
+        color: #713b12;
+        background: #f5d6b8;
+      }
+
+      .color-blind-mode .priority-medium {
+        color: #174b78;
+        background: #cfe3f8;
+      }
+
+      .color-blind-mode .priority-low {
+        color: #303943;
+        background: #e2e5e9;
+      }
+
+      .color-blind-mode .priority-high::before {
+        content: "▲ ";
+      }
+
+      .color-blind-mode .priority-medium::before {
+        content: "■ ";
+      }
+
+      .color-blind-mode .priority-low::before {
+        content: "● ";
+      }
+
+      .dark-mode.color-blind-mode .table .priority-row-high td {
+        color: #fff;
+        background: #79400f;
+      }
+
+      .dark-mode.color-blind-mode .table .priority-row-medium td {
+        color: #fff;
+        background: #174b78;
+      }
+
+      .dark-mode.color-blind-mode .table .priority-row-low td {
+        color: #fff;
+        background: #414b56;
+      }
+
+      .dark-mode.color-blind-mode .table .priority-row-high:hover td {
+        background: #9a581e;
+      }
+
+      .dark-mode.color-blind-mode .table .priority-row-medium:hover td {
+        background: #23689f;
+      }
+
+      .dark-mode.color-blind-mode .table .priority-row-low:hover td {
+        background: #586574;
+      }
+
+      .dark-mode.color-blind-mode .priority-high {
+        color: #fff;
+        background: #79400f;
+      }
+
+      .dark-mode.color-blind-mode .priority-medium {
+        color: #fff;
+        background: #174b78;
+      }
+
+      .dark-mode.color-blind-mode .priority-low {
+        color: #fff;
+        background: #414b56;
+      }
+
       .card,
       .stat {
         padding: 12px;
@@ -442,6 +535,9 @@
             <button type="button" id="theme-toggle" aria-pressed="false" onclick="toggleTheme()">
               ☾ Dark mode
             </button>
+            <button type="button" id="color-blind-toggle" aria-pressed="false" onclick="toggleColorBlindMode()">
+              Color-blind mode: Off
+            </button>
             <button type="button" data-profile="osamah" aria-pressed="false" onclick="setProfile('osamah')">
               Osamah Settings
             </button>
@@ -559,11 +655,13 @@
       const storageKey = "tickets_v4";
       const profileStorageKey = "ticket_dashboard_profile";
       const themeStorageKey = "ticket_dashboard_theme";
+      const colorBlindStorageKey = "ticket_dashboard_color_blind";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const reminderInterval = 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
       let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
       let activeTheme = localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light";
+      let colorBlindMode = localStorage.getItem(colorBlindStorageKey) === "on";
       let activeCategory = "All";
       let visibleTicketLimit = ticketPageSize;
       let lastHourlyReminderKey = "";
@@ -629,6 +727,15 @@
         const isDark = theme === "dark";
         themeToggle.textContent = isDark ? "☀ Light mode" : "☾ Dark mode";
         themeToggle.setAttribute("aria-pressed", String(isDark));
+      }
+
+      function toggleColorBlindMode() {
+        colorBlindMode = !colorBlindMode;
+        localStorage.setItem(colorBlindStorageKey, colorBlindMode ? "on" : "off");
+        document.body.classList.toggle("color-blind-mode", colorBlindMode);
+        const toggle = document.getElementById("color-blind-toggle");
+        toggle.textContent = `Color-blind mode: ${colorBlindMode ? "On" : "Off"}`;
+        toggle.setAttribute("aria-pressed", String(colorBlindMode));
       }
 
       function setProfile(profile) {
@@ -1230,6 +1337,10 @@
       checkHourlyReminder();
       setInterval(checkHourlyReminder, 15 * 1000);
       setTheme(activeTheme);
+      document.body.classList.toggle("color-blind-mode", colorBlindMode);
+      document.getElementById("color-blind-toggle").textContent =
+        `Color-blind mode: ${colorBlindMode ? "On" : "Off"}`;
+      document.getElementById("color-blind-toggle").setAttribute("aria-pressed", String(colorBlindMode));
       render();
     </script>
   </body>

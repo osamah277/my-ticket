@@ -385,8 +385,8 @@
         border-bottom: 8px solid #f5f7fa;
       }
 
-      .table.profile-steven th:nth-child(5),
-      .table.profile-steven td:nth-child(5) {
+      .table.profile-steven th:nth-child(6),
+      .table.profile-steven td:nth-child(6) {
         display: none;
       }
 
@@ -598,6 +598,7 @@
       <table class="table profile-steven" id="ticket-table">
         <thead>
           <tr>
+            <th>Order</th>
             <th>Ticket #</th>
             <th>Customer</th>
             <th>Status</th>
@@ -605,10 +606,10 @@
             <th>Ticket From</th>
             <th>Last Updated</th>
             <th>Description</th>
-            <th>Order</th>
             <th>Actions</th>
           </tr>
           <tr class="column-filters">
+            <th></th>
             <th><input id="filter-ticket-number" aria-label="Filter by ticket number" placeholder="Filter..." oninput="resetTicketList()"></th>
             <th><input id="filter-customer" aria-label="Filter by customer" placeholder="Filter..." oninput="resetTicketList()"></th>
             <th>
@@ -639,7 +640,6 @@
             </th>
             <th><input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()"></th>
             <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
-            <th></th>
             <th></th>
           </tr>
         </thead>
@@ -1228,15 +1228,6 @@
               ondragend="endTicketDrag()"
               onclick="toggle(${index})"
             >
-              <td>${ticketLink
-                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${ticket.ticketNumber}</a>`
-                : ticket.ticketNumber}</td>
-              <td>${ticket.customerName}</td>
-              <td>${ticket.status}</td>
-              <td><span class="priority-badge ${priorityClass(ticket.priority)}">${ticket.priority}</span></td>
-              <td>${ticket.ticketFrom || "—"}</td>
-              <td>${ticket.lastUpdate || "—"}</td>
-              <td>${ticket.shortDescription}</td>
               <td>
                 <input
                   class="position-input"
@@ -1250,6 +1241,15 @@
                   onclick="event.stopPropagation()"
                 >
               </td>
+              <td>${ticketLink
+                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${ticket.ticketNumber}</a>`
+                : ticket.ticketNumber}</td>
+              <td>${ticket.customerName}</td>
+              <td>${ticket.status}</td>
+              <td><span class="priority-badge ${priorityClass(ticket.priority)}">${ticket.priority}</span></td>
+              <td>${ticket.ticketFrom || "—"}</td>
+              <td>${ticket.lastUpdate || "—"}</td>
+              <td>${ticket.shortDescription}</td>
               <td>
                 <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">
                   Delete
@@ -1257,7 +1257,7 @@
               </td>
             </tr>
             <tr id="detail-row-${index}" hidden>
-              <td colspan="${activeProfile === "osamah" ? 8 : 9}">
+              <td colspan="${activeProfile === "steven" ? 8 : 9}">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>

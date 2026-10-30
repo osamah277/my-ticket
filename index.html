@@ -1185,6 +1185,17 @@
         detail.style.display = isOpen ? "none" : "block";
       }
 
+      function updateLastUpdate(index) {
+        tickets[index].lastUpdate = new Date().toLocaleString();
+      }
+
+      function openTicket(event, index) {
+        event.stopPropagation();
+        updateLastUpdate(index);
+        save();
+        document.getElementById(`last-update-${index}`).textContent = tickets[index].lastUpdate;
+      }
+
       function addNote(index) {
         const noteInput = document.getElementById(`note${index}`);
         const text = noteInput.value.trim();
@@ -1194,6 +1205,7 @@
           date: new Date().toLocaleString(),
           text,
         });
+        updateLastUpdate(index);
         save();
         render();
       }
@@ -1201,7 +1213,7 @@
       function statusChange(index, status) {
         if (tickets[index].status === status) return;
         tickets[index].status = status;
-        tickets[index].lastUpdate = new Date().toLocaleString();
+        updateLastUpdate(index);
         if (needsStatusReminder(status)) {
           tickets[index].nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
         } else {
@@ -1220,7 +1232,7 @@
         }
 
         tickets[index].priority = priority;
-        tickets[index].lastUpdate = new Date().toLocaleString();
+        updateLastUpdate(index);
         save();
         render();
       }
@@ -1508,13 +1520,13 @@
                 >
               </td>
               <td>${ticketLink
-                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${ticket.ticketNumber}</a>`
+                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="openTicket(event, ${index})">${ticket.ticketNumber}</a>`
                 : ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>
               <td><span class="priority-badge ${priorityClass(ticket.priority)}">${ticket.priority}</span></td>
               <td>${ticket.ticketFrom || "—"}</td>
-              <td>${ticket.lastUpdate || "—"}</td>
+              <td id="last-update-${index}">${ticket.lastUpdate || "—"}</td>
               <td>${ticket.shortDescription}</td>
               <td>
                 <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">

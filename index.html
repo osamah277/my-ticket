@@ -740,6 +740,7 @@
       const colorBlindStorageKey = "ticket_dashboard_color_blind";
       const columnWidthsStorageKey = "ticket_dashboard_column_widths";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
+      const hourlyReminderInterval = 60 * 60 * 1000;
       const reminderInterval = 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
@@ -750,7 +751,6 @@
       let colorBlindMode = localStorage.getItem(colorBlindStorageKey) === "on";
       let activeCategory = "All";
       let visibleTicketLimit = ticketPageSize;
-      let lastHourlyReminderKey = "";
       let notificationQueue = [];
       let previousFocus = null;
       let draggedTicket = null;
@@ -760,6 +760,17 @@
           if (cleanedTicket.status === "Open") cleanedTicket.status = "Assigned";
           if (!["High", "Medium", "Low"].includes(cleanedTicket.priority)) {
             cleanedTicket.priority = "Medium";
+          }
+          const lastUpdateAt = Date.parse(cleanedTicket.lastUpdateAt);
+          const legacyLastUpdateAt = Date.parse(cleanedTicket.lastUpdate);
+          const normalizedLastUpdateAt = Number.isNaN(lastUpdateAt)
+            ? Number.isNaN(legacyLastUpdateAt) ? Date.now() : legacyLastUpdateAt
+            : lastUpdateAt;
+          cleanedTicket.lastUpdateAt = new Date(normalizedLastUpdateAt).toISOString();
+          if (Number.isNaN(Date.parse(cleanedTicket.nextHourlyReminderAt))) {
+            cleanedTicket.nextHourlyReminderAt = new Date(
+              normalizedLastUpdateAt + hourlyReminderInterval
+            ).toISOString();
           }
           if (
             needsStatusReminder(cleanedTicket.status) &&
@@ -1078,17 +1089,30 @@
 
       function checkHourlyReminder() {
         const now = new Date();
-        if (now.getHours() < 7 || now.getHours() > 15 || now.getMinutes() !== 0) return;
+        if (now.getHours() < 7 || now.getHours() > 15) return;
 
-        const activeTickets = tickets.filter((ticket) => ticket.status !== "Closed");
-        if (!activeTickets.length) return;
+        const dueTickets = [];
+        tickets.forEach((ticket) => {
+          if (ticket.status === "Closed") return;
 
-        const reminderKey = `${now.getFullYear()}-${now.getMonth()}-${now.getDate()}-${now.getHours()}`;
-        if (reminderKey === lastHourlyReminderKey) return;
+          let nextReminder = Date.parse(ticket.nextHourlyReminderAt);
+          if (Number.isNaN(nextReminder)) {
+            nextReminder = Date.parse(ticket.lastUpdateAt) + hourlyReminderInterval;
+          }
+          if (Number.isNaN(nextReminder) || nextReminder > now.getTime()) return;
 
-        lastHourlyReminderKey = reminderKey;
-        const ticketNumbers = activeTickets.map((ticket) => ticket.ticketNumber).join(", ");
-        pop(`Hourly reminder: check active tickets ${ticketNumbers}`, activeTickets);
+          dueTickets.push(ticket);
+          do {
+            nextReminder += hourlyReminderInterval;
+          } while (nextReminder <= now.getTime());
+          ticket.nextHourlyReminderAt = new Date(nextReminder).toISOString();
+        });
+
+        if (dueTickets.length) {
+          save();
+          const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
+          pop(`Hourly reminder: check tickets not updated in the last hour ${ticketNumbers}`, dueTickets);
+        }
       }
 
       function nextId() {
@@ -1149,6 +1173,7 @@
           return;
         }
 
+        const createdAt = new Date();
         const ticket = {
           ticketNumber,
           ticketLink,
@@ -1158,8 +1183,10 @@
           assignedDate: document.getElementById("ad").value,
           status: document.getElementById("st").value,
           priority: document.getElementById("priority").value,
-          createdAt: new Date().toISOString(),
-          lastUpdate: formatLastUpdate(new Date()),
+          createdAt: createdAt.toISOString(),
+          lastUpdateAt: createdAt.toISOString(),
+          lastUpdate: formatLastUpdate(createdAt),
+          nextHourlyReminderAt: new Date(createdAt.getTime() + hourlyReminderInterval).toISOString(),
           notes: [],
         };
         if (needsStatusReminder(ticket.status)) {
@@ -1187,9 +1214,12 @@
 
       function updateLastUpdate(index) {
         const now = Date.now();
-        const previous = Date.parse(tickets[index].lastUpdate);
+        const previous = Date.parse(tickets[index].lastUpdateAt);
         const updatedAt = Number.isFinite(previous) ? Math.max(now, previous + 1000) : now;
+        tickets[index].lastUpdateAt = new Date(updatedAt).toISOString();
         tickets[index].lastUpdate = formatLastUpdate(new Date(updatedAt));
+        tickets[index].nextHourlyReminderAt =
+          new Date(updatedAt + hourlyReminderInterval).toISOString();
       }
 
       function formatLastUpdate(date) {

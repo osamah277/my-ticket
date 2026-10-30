@@ -440,16 +440,38 @@
 
       function showNotification(notification) {
         const messageElement = document.getElementById("notification-message");
-        messageElement.textContent = notification.message;
-        notification.linkedTickets.forEach((ticket) => {
-          const link = document.createElement("a");
-          link.href = getTicketLink(ticket);
-          link.target = "_blank";
-          link.rel = "noopener noreferrer";
-          link.textContent = `Open ticket ${ticket.ticketNumber}`;
-          link.addEventListener("click", (event) => event.stopPropagation());
-          messageElement.append(document.createElement("br"), link);
-        });
+        messageElement.replaceChildren();
+        const ticketsByNumber = new Map(
+          notification.linkedTickets.map((ticket) => [ticket.ticketNumber, ticket])
+        );
+        const ticketNumbers = [...ticketsByNumber.keys()]
+          .sort((left, right) => right.length - left.length)
+          .map((ticketNumber) => ticketNumber.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+
+        if (ticketNumbers.length) {
+          const ticketNumberPattern = new RegExp(`(${ticketNumbers.join("|")})`, "g");
+          let previousIndex = 0;
+          for (const match of notification.message.matchAll(ticketNumberPattern)) {
+            const ticketNumber = match[0];
+            const matchIndex = match.index;
+            messageElement.append(
+              document.createTextNode(notification.message.slice(previousIndex, matchIndex))
+            );
+
+            const link = document.createElement("a");
+            link.href = getTicketLink(ticketsByNumber.get(ticketNumber));
+            link.target = "_blank";
+            link.rel = "noopener noreferrer";
+            link.textContent = ticketNumber;
+            link.addEventListener("click", (event) => event.stopPropagation());
+            messageElement.append(link);
+            previousIndex = matchIndex + ticketNumber.length;
+          }
+          messageElement.append(document.createTextNode(notification.message.slice(previousIndex)));
+        } else {
+          messageElement.textContent = notification.message;
+        }
+
         document.getElementById("app-content").inert = true;
         document.getElementById("n").style.display = "flex";
         document.querySelector(".notif-dialog button").focus();

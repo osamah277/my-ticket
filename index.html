@@ -390,6 +390,10 @@
         display: none;
       }
 
+      .table.profile-steven col:nth-child(6) {
+        display: none;
+      }
+
       .position-input {
         width: 4.5em;
         margin: 0;
@@ -412,27 +416,57 @@
         border-top: 3px solid #4a90e2;
       }
 
-      .table {
+      .table-container {
         width: 100%;
+        overflow-x: auto;
+      }
+
+      .table {
+        width: max-content;
         border-collapse: collapse;
         table-layout: fixed;
         background: #fff;
       }
 
       .table th {
+        position: relative;
         background: #dce6f1;
       }
 
-      .table th:nth-child(8),
-      .table td:nth-child(8) {
-        width: 32%;
-        min-width: 220px;
+      .column-resizer {
+        position: absolute;
+        top: 0;
+        right: -5px;
+        bottom: 0;
+        z-index: 1;
+        width: 10px;
+        cursor: col-resize;
+        touch-action: none;
       }
 
-      .table th:nth-child(9),
-      .table td:nth-child(9) {
-        width: 120px;
-        white-space: nowrap;
+      .column-resizer::after {
+        position: absolute;
+        top: 20%;
+        bottom: 20%;
+        left: 4px;
+        width: 2px;
+        background: transparent;
+        content: "";
+      }
+
+      .column-resizer:hover::after,
+      .column-resizer:focus-visible::after {
+        background: #4a90e2;
+      }
+
+      .column-resizer:focus-visible {
+        outline: 2px solid #4a90e2;
+        outline-offset: -2px;
+      }
+
+      body.column-resizing {
+        cursor: col-resize;
+        user-select: none;
       }
 
       .column-filters input,
@@ -608,7 +642,19 @@
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
 
-      <table class="table profile-steven" id="ticket-table">
+      <div class="table-container">
+        <table class="table profile-steven" id="ticket-table">
+          <colgroup>
+            <col data-column-key="order">
+            <col data-column-key="ticket-number">
+            <col data-column-key="customer">
+            <col data-column-key="status">
+            <col data-column-key="priority">
+            <col data-column-key="ticket-from">
+            <col data-column-key="last-updated">
+            <col data-column-key="description">
+            <col data-column-key="actions">
+          </colgroup>
         <thead>
           <tr>
             <th>Order</th>
@@ -657,7 +703,8 @@
           </tr>
         </thead>
         <tbody id="list"></tbody>
-      </table>
+        </table>
+      </div>
       <div id="load-more-container" hidden>
         <button class="btn" type="button" onclick="loadMoreTickets()">Load 20 more tickets</button>
       </div>
@@ -669,9 +716,12 @@
       const profileStorageKey = "ticket_dashboard_profile";
       const themeStorageKey = "ticket_dashboard_theme";
       const colorBlindStorageKey = "ticket_dashboard_color_blind";
+      const columnWidthsStorageKey = "ticket_dashboard_column_widths";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const reminderInterval = 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
+      const minimumColumnWidth = 90;
+      const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320, 120];
       let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
       let activeTheme = localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light";
       let colorBlindMode = localStorage.getItem(colorBlindStorageKey) === "on";
@@ -713,6 +763,104 @@
 
       function save() {
         localStorage.setItem(storageKey, JSON.stringify(tickets));
+      }
+
+      function updateTableWidth() {
+        const table = document.getElementById("ticket-table");
+        const headers = table.querySelectorAll("thead tr:first-child th");
+        const columns = table.querySelectorAll("colgroup col");
+        const visibleWidth = [...headers].reduce((total, header, index) => {
+          if (getComputedStyle(header).display === "none") return total;
+          return total + Number.parseFloat(columns[index].style.width);
+        }, 0);
+
+        table.style.width = `${visibleWidth}px`;
+      }
+
+      function saveColumnWidths() {
+        const widths = {};
+        document.querySelectorAll("#ticket-table colgroup col").forEach((column) => {
+          widths[column.dataset.columnKey] = Number.parseFloat(column.style.width);
+        });
+        localStorage.setItem(columnWidthsStorageKey, JSON.stringify(widths));
+      }
+
+      function setColumnWidth(index, width) {
+        const columns = document.querySelectorAll("#ticket-table colgroup col");
+        const column = columns[index];
+        const boundedWidth = Math.max(minimumColumnWidth, width);
+        column.style.width = `${boundedWidth}px`;
+        updateTableWidth();
+        return boundedWidth;
+      }
+
+      function initializeColumnResizing() {
+        const table = document.getElementById("ticket-table");
+        const columns = [...table.querySelectorAll("colgroup col")];
+        const headers = [...table.querySelectorAll("thead tr:first-child th")];
+        const savedWidths = JSON.parse(localStorage.getItem(columnWidthsStorageKey) || "{}");
+
+        columns.forEach((column, index) => {
+          const savedWidth = Number(savedWidths[column.dataset.columnKey]);
+          const width = Number.isFinite(savedWidth)
+            ? Math.max(minimumColumnWidth, savedWidth)
+            : defaultColumnWidths[index];
+          column.style.width = `${width}px`;
+
+          const handle = document.createElement("span");
+          handle.className = "column-resizer";
+          handle.setAttribute("role", "separator");
+          handle.setAttribute("aria-orientation", "vertical");
+          handle.setAttribute("aria-label", `Resize ${headers[index].textContent.trim()} column`);
+          handle.setAttribute("aria-valuemin", String(minimumColumnWidth));
+          handle.setAttribute("aria-valuenow", String(width));
+          handle.setAttribute("tabindex", "0");
+          handle.title = "Drag to resize, or focus and use the arrow keys";
+
+          handle.addEventListener("pointerdown", (event) => {
+            if (event.button !== 0) return;
+
+            event.preventDefault();
+            const startX = event.clientX;
+            const startWidth = columns[index].getBoundingClientRect().width;
+            const pointerId = event.pointerId;
+            handle.setPointerCapture(pointerId);
+            document.body.classList.add("column-resizing");
+
+            const onPointerMove = (moveEvent) => {
+              if (moveEvent.pointerId !== pointerId) return;
+              const width = setColumnWidth(index, startWidth + moveEvent.clientX - startX);
+              handle.setAttribute("aria-valuenow", String(Math.round(width)));
+            };
+
+            const onPointerEnd = (endEvent) => {
+              if (endEvent.pointerId !== pointerId) return;
+              handle.removeEventListener("pointermove", onPointerMove);
+              handle.removeEventListener("pointerup", onPointerEnd);
+              handle.removeEventListener("pointercancel", onPointerEnd);
+              document.body.classList.remove("column-resizing");
+              saveColumnWidths();
+            };
+
+            handle.addEventListener("pointermove", onPointerMove);
+            handle.addEventListener("pointerup", onPointerEnd);
+            handle.addEventListener("pointercancel", onPointerEnd);
+          });
+
+          handle.addEventListener("keydown", (event) => {
+            if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+            event.preventDefault();
+            const amount = event.shiftKey ? 20 : 10;
+            const delta = event.key === "ArrowRight" ? amount : -amount;
+            const width = setColumnWidth(index, Number.parseFloat(columns[index].style.width) + delta);
+            handle.setAttribute("aria-valuenow", String(Math.round(width)));
+            saveColumnWidths();
+          });
+
+          headers[index].append(handle);
+        });
+
+        updateTableWidth();
       }
 
       save();
@@ -1212,6 +1360,7 @@
         const visibleTickets = getVisibleTickets();
 
         document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
+        updateTableWidth();
         document.querySelectorAll(".settings-panel [data-profile]").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.profile === activeProfile));
         });
@@ -1354,6 +1503,7 @@
       document.getElementById("color-blind-toggle").textContent =
         `Color-blind mode: ${colorBlindMode ? "On" : "Off"}`;
       document.getElementById("color-blind-toggle").setAttribute("aria-pressed", String(colorBlindMode));
+      initializeColumnResizing();
       render();
     </script>
   </body>

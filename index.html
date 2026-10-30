@@ -378,6 +378,7 @@
 
     <script>
       const storageKey = "tickets_v4";
+      const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const reminderInterval = 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
       let activeCategory = "All";
@@ -441,11 +442,8 @@
         const messageElement = document.getElementById("notification-message");
         messageElement.textContent = notification.message;
         notification.linkedTickets.forEach((ticket) => {
-          const ticketLink = normalizeTicketLink(ticket.ticketLink);
-          if (!ticketLink) return;
-
           const link = document.createElement("a");
-          link.href = ticketLink;
+          link.href = getTicketLink(ticket);
           link.target = "_blank";
           link.rel = "noopener noreferrer";
           link.textContent = `Open ticket ${ticket.ticketNumber}`;
@@ -514,6 +512,10 @@
         } catch {
           return null;
         }
+      }
+
+      function getTicketLink(ticket) {
+        return normalizeTicketLink(ticket.ticketLink) || defaultTicketLink;
       }
 
       function escapeAttribute(value) {
@@ -867,7 +869,7 @@
 
         ticketsToRender.forEach((ticket, visiblePosition) => {
           const index = tickets.indexOf(ticket);
-          const ticketLink = normalizeTicketLink(ticket.ticketLink);
+          const ticketLink = getTicketLink(ticket);
           ticketList.innerHTML += `
             <tr
               class="ticket-row priority-row-${ticket.priority.toLowerCase()}"

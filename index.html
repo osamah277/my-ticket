@@ -1159,7 +1159,7 @@
           status: document.getElementById("st").value,
           priority: document.getElementById("priority").value,
           createdAt: new Date().toISOString(),
-          lastUpdate: new Date().toLocaleString(),
+          lastUpdate: formatLastUpdate(new Date()),
           notes: [],
         };
         if (needsStatusReminder(ticket.status)) {
@@ -1186,7 +1186,21 @@
       }
 
       function updateLastUpdate(index) {
-        tickets[index].lastUpdate = new Date().toLocaleString();
+        const now = Date.now();
+        const previous = Date.parse(tickets[index].lastUpdate);
+        const updatedAt = Number.isFinite(previous) ? Math.max(now, previous + 1000) : now;
+        tickets[index].lastUpdate = formatLastUpdate(new Date(updatedAt));
+      }
+
+      function formatLastUpdate(date) {
+        return date.toLocaleString(undefined, {
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "2-digit",
+          second: "2-digit",
+        });
       }
 
       function openTicket(event, index) {

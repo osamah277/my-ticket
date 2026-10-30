@@ -655,54 +655,54 @@
             <col data-column-key="description">
             <col data-column-key="actions">
           </colgroup>
-        <thead>
-          <tr>
-            <th>Order</th>
-            <th>Ticket #</th>
-            <th>Customer</th>
-            <th>Status</th>
-            <th>Priority</th>
-            <th>Ticket From</th>
-            <th>Last Updated</th>
-            <th>Description</th>
-            <th>Actions</th>
-          </tr>
-          <tr class="column-filters">
-            <th></th>
-            <th><input id="filter-ticket-number" aria-label="Filter by ticket number" placeholder="Filter..." oninput="resetTicketList()"></th>
-            <th><input id="filter-customer" aria-label="Filter by customer" placeholder="Filter..." oninput="resetTicketList()"></th>
-            <th>
-              <select id="filter-status" aria-label="Filter by status" onchange="resetTicketList()">
-                <option value="">All statuses</option>
-                <option>Assigned</option>
-                <option>In Progress</option>
-                <option>Pending Customer</option>
-                <option>Pending Vendor</option>
-                <option>Resolved</option>
-                <option>Closed</option>
-              </select>
-            </th>
-            <th>
-              <select id="filter-priority" aria-label="Filter by priority" onchange="resetTicketList()">
-                <option value="">All priorities</option>
-                <option>High</option>
-                <option>Medium</option>
-                <option>Low</option>
-              </select>
-            </th>
-            <th>
-              <select id="filter-ticket-from" aria-label="Filter by ticket from" onchange="resetTicketList()">
-                <option value="">All sources</option>
-                <option value="AM">AM</option>
-                <option value="PS">PS</option>
-              </select>
-            </th>
-            <th><input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()"></th>
-            <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="list"></tbody>
+          <thead>
+            <tr>
+              <th>Order</th>
+              <th>Ticket #</th>
+              <th>Customer</th>
+              <th>Status</th>
+              <th>Priority</th>
+              <th>Ticket From</th>
+              <th>Last Updated</th>
+              <th>Description</th>
+              <th>Actions</th>
+            </tr>
+            <tr class="column-filters">
+              <th></th>
+              <th><input id="filter-ticket-number" aria-label="Filter by ticket number" placeholder="Filter..." oninput="resetTicketList()"></th>
+              <th><input id="filter-customer" aria-label="Filter by customer" placeholder="Filter..." oninput="resetTicketList()"></th>
+              <th>
+                <select id="filter-status" aria-label="Filter by status" onchange="resetTicketList()">
+                  <option value="">All statuses</option>
+                  <option>Assigned</option>
+                  <option>In Progress</option>
+                  <option>Pending Customer</option>
+                  <option>Pending Vendor</option>
+                  <option>Resolved</option>
+                  <option>Closed</option>
+                </select>
+              </th>
+              <th>
+                <select id="filter-priority" aria-label="Filter by priority" onchange="resetTicketList()">
+                  <option value="">All priorities</option>
+                  <option>High</option>
+                  <option>Medium</option>
+                  <option>Low</option>
+                </select>
+              </th>
+              <th>
+                <select id="filter-ticket-from" aria-label="Filter by ticket from" onchange="resetTicketList()">
+                  <option value="">All sources</option>
+                  <option value="AM">AM</option>
+                  <option value="PS">PS</option>
+                </select>
+              </th>
+              <th><input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()"></th>
+              <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="list"></tbody>
         </table>
       </div>
       <div id="load-more-container" hidden>

@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Ticket Dashboard V4</title>
+    <title>Ticket Dashboard V1</title>
     <style>
       * {
         box-sizing: border-box;
@@ -418,11 +418,11 @@
 
       .table-container {
         width: 100%;
-        overflow-x: auto;
+        overflow-x: hidden;
       }
 
       .table {
-        width: max-content;
+        width: 100%;
         border-collapse: collapse;
         table-layout: fixed;
         background: #fff;
@@ -471,7 +471,7 @@
 
       .column-filters input,
       .column-filters select {
-        min-width: 90px;
+        min-width: 0;
         margin: 0;
         padding: 6px;
       }
@@ -480,6 +480,7 @@
       .table td {
         padding: 10px;
         border: 1px solid #d3dce6;
+        overflow-wrap: anywhere;
       }
 
       .detail {
@@ -544,6 +545,27 @@
       @media (max-width: 600px) {
         body {
           margin: 12px;
+        }
+
+        .table th,
+        .table td {
+          padding: 4px;
+          font-size: 0.75rem;
+        }
+
+        .position-input {
+          width: 100%;
+          font-size: 0.75rem;
+        }
+
+        .priority-badge {
+          padding: 2px 4px;
+          white-space: normal;
+        }
+
+        .delete-btn {
+          padding: 4px;
+          font-size: 0.7rem;
         }
 
         .stats {
@@ -722,6 +744,7 @@
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320, 120];
+      let preferredColumnWidths = {};
       let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
       let activeTheme = localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light";
       let colorBlindMode = localStorage.getItem(colorBlindStorageKey) === "on";
@@ -767,31 +790,74 @@
 
       function updateTableWidth() {
         const table = document.getElementById("ticket-table");
+        const containerWidth = table.parentElement.clientWidth;
         const headers = table.querySelectorAll("thead tr:first-child th");
         const columns = table.querySelectorAll("colgroup col");
-        const visibleWidth = [...headers].reduce((total, header, index) => {
-          if (getComputedStyle(header).display === "none") return total;
-          return total + Number.parseFloat(columns[index].style.width);
-        }, 0);
+        const visibleIndices = [...headers]
+          .map((header, index) => getComputedStyle(header).display !== "none" ? index : -1)
+          .filter((index) => index >= 0);
+        const minimumWidth = Math.min(minimumColumnWidth, containerWidth / visibleIndices.length);
+        const assignedWidths = new Map();
+        let remainingIndices = [...visibleIndices];
+        let remainingWidth = containerWidth;
 
-        table.style.width = `${visibleWidth}px`;
+        while (remainingIndices.length) {
+          const totalPreferredWidth = remainingIndices.reduce(
+            (total, index) => total + preferredColumnWidths[columns[index].dataset.columnKey],
+            0
+          );
+          const tooNarrow = remainingIndices.filter((index) =>
+            remainingWidth * preferredColumnWidths[columns[index].dataset.columnKey] / totalPreferredWidth < minimumWidth
+          );
+
+          if (!tooNarrow.length) {
+            remainingIndices.forEach((index) => {
+              assignedWidths.set(
+                index,
+                remainingWidth * preferredColumnWidths[columns[index].dataset.columnKey] / totalPreferredWidth
+              );
+            });
+            break;
+          }
+
+          tooNarrow.forEach((index) => {
+            assignedWidths.set(index, minimumWidth);
+            remainingWidth -= minimumWidth;
+          });
+          remainingIndices = remainingIndices.filter((index) => !tooNarrow.includes(index));
+        }
+
+        columns.forEach((column, index) => {
+          column.style.width = assignedWidths.has(index)
+            ? `${assignedWidths.get(index) / containerWidth * 100}%`
+            : "0";
+        });
+        table.style.width = "100%";
       }
 
       function saveColumnWidths() {
-        const widths = {};
-        document.querySelectorAll("#ticket-table colgroup col").forEach((column) => {
-          widths[column.dataset.columnKey] = Number.parseFloat(column.style.width);
-        });
-        localStorage.setItem(columnWidthsStorageKey, JSON.stringify(widths));
+        localStorage.setItem(columnWidthsStorageKey, JSON.stringify(preferredColumnWidths));
       }
 
-      function setColumnWidth(index, width) {
+      function getResizeNeighbor(index, visibleIndices) {
+        const visiblePosition = visibleIndices.indexOf(index);
+        return visibleIndices[visiblePosition + 1] ?? visibleIndices[visiblePosition - 1];
+      }
+
+      function syncVisibleColumnWidths(visibleIndices) {
         const columns = document.querySelectorAll("#ticket-table colgroup col");
-        const column = columns[index];
-        const boundedWidth = Math.max(minimumColumnWidth, width);
-        column.style.width = `${boundedWidth}px`;
+        visibleIndices.forEach((index) => {
+          preferredColumnWidths[columns[index].dataset.columnKey] =
+            columns[index].getBoundingClientRect().width;
+        });
+      }
+
+      function resizeColumn(index, neighborIndex, width, neighborWidth) {
+        const columns = document.querySelectorAll("#ticket-table colgroup col");
+        preferredColumnWidths[columns[index].dataset.columnKey] = width;
+        preferredColumnWidths[columns[neighborIndex].dataset.columnKey] = neighborWidth;
         updateTableWidth();
-        return boundedWidth;
+        return columns[index].getBoundingClientRect().width;
       }
 
       function initializeColumnResizing() {
@@ -802,10 +868,9 @@
 
         columns.forEach((column, index) => {
           const savedWidth = Number(savedWidths[column.dataset.columnKey]);
-          const width = Number.isFinite(savedWidth)
-            ? Math.max(minimumColumnWidth, savedWidth)
+          preferredColumnWidths[column.dataset.columnKey] = Number.isFinite(savedWidth) && savedWidth > 0
+            ? savedWidth
             : defaultColumnWidths[index];
-          column.style.width = `${width}px`;
 
           const handle = document.createElement("span");
           handle.className = "column-resizer";
@@ -813,23 +878,40 @@
           handle.setAttribute("aria-orientation", "vertical");
           handle.setAttribute("aria-label", `Resize ${headers[index].textContent.trim()} column`);
           handle.setAttribute("aria-valuemin", String(minimumColumnWidth));
-          handle.setAttribute("aria-valuenow", String(width));
           handle.setAttribute("tabindex", "0");
           handle.title = "Drag to resize, or focus and use the arrow keys";
 
           handle.addEventListener("pointerdown", (event) => {
             if (event.button !== 0) return;
 
+            const visibleIndices = headers
+              .map((header, headerIndex) => getComputedStyle(header).display !== "none" ? headerIndex : -1)
+              .filter((headerIndex) => headerIndex >= 0);
+            const neighborIndex = getResizeNeighbor(index, visibleIndices);
+            if (neighborIndex === undefined) return;
+
             event.preventDefault();
+            syncVisibleColumnWidths(visibleIndices);
             const startX = event.clientX;
             const startWidth = columns[index].getBoundingClientRect().width;
+            const startNeighborWidth = columns[neighborIndex].getBoundingClientRect().width;
             const pointerId = event.pointerId;
             handle.setPointerCapture(pointerId);
             document.body.classList.add("column-resizing");
 
             const onPointerMove = (moveEvent) => {
               if (moveEvent.pointerId !== pointerId) return;
-              const width = setColumnWidth(index, startWidth + moveEvent.clientX - startX);
+              const minimumWidth = Math.min(minimumColumnWidth, table.parentElement.clientWidth / visibleIndices.length);
+              const delta = Math.max(
+                minimumWidth - startWidth,
+                Math.min(startNeighborWidth - minimumWidth, moveEvent.clientX - startX)
+              );
+              const width = resizeColumn(
+                index,
+                neighborIndex,
+                startWidth + delta,
+                startNeighborWidth - delta
+              );
               handle.setAttribute("aria-valuenow", String(Math.round(width)));
             };
 
@@ -849,10 +931,31 @@
 
           handle.addEventListener("keydown", (event) => {
             if (event.key !== "ArrowLeft" && event.key !== "ArrowRight") return;
+            const visibleIndices = headers
+              .map((header, headerIndex) => getComputedStyle(header).display !== "none" ? headerIndex : -1)
+              .filter((headerIndex) => headerIndex >= 0);
+            const neighborIndex = getResizeNeighbor(index, visibleIndices);
+            if (neighborIndex === undefined) return;
+
             event.preventDefault();
+            syncVisibleColumnWidths(visibleIndices);
+            const startWidth = columns[index].getBoundingClientRect().width;
+            const startNeighborWidth = columns[neighborIndex].getBoundingClientRect().width;
+            const minimumWidth = Math.min(minimumColumnWidth, table.parentElement.clientWidth / visibleIndices.length);
             const amount = event.shiftKey ? 20 : 10;
-            const delta = event.key === "ArrowRight" ? amount : -amount;
-            const width = setColumnWidth(index, Number.parseFloat(columns[index].style.width) + delta);
+            const delta = Math.max(
+              minimumWidth - startWidth,
+              Math.min(
+                startNeighborWidth - minimumWidth,
+                event.key === "ArrowRight" ? amount : -amount
+              )
+            );
+            const width = resizeColumn(
+              index,
+              neighborIndex,
+              startWidth + delta,
+              startNeighborWidth - delta
+            );
             handle.setAttribute("aria-valuenow", String(Math.round(width)));
             saveColumnWidths();
           });
@@ -861,6 +964,7 @@
         });
 
         updateTableWidth();
+        window.addEventListener("resize", updateTableWidth);
       }
 
       save();

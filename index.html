@@ -297,6 +297,7 @@
           <input id="tn" placeholder="Ticket Number (leave blank for auto)">
           <input id="cn" placeholder="Customer Name">
         </div>
+        <input id="ticket-link" type="url" placeholder="Ticket Link (optional, e.g. https://...)">
         <input id="tf" placeholder="Ticket From">
         <input id="sd" placeholder="Short Description">
         <div class="row">
@@ -488,6 +489,29 @@
         );
       }
 
+      function normalizeTicketLink(value) {
+        if (typeof value !== "string") return "";
+        const link = value.trim();
+        if (!link) return "";
+
+        try {
+          const url = new URL(link);
+          return url.protocol === "http:" || url.protocol === "https:" ? url.href : null;
+        } catch {
+          return null;
+        }
+      }
+
+      function escapeAttribute(value) {
+        return value.replace(/[&"<>']/g, (character) => ({
+          "&": "&amp;",
+          '"': "&quot;",
+          "<": "&lt;",
+          ">": "&gt;",
+          "'": "&#39;",
+        })[character]);
+      }
+
       function createTicket() {
         const enteredTicketNumber = document.getElementById("tn").value.trim();
         const ticketNumber = enteredTicketNumber || nextId();
@@ -496,8 +520,15 @@
           return;
         }
 
+        const ticketLink = normalizeTicketLink(document.getElementById("ticket-link").value);
+        if (ticketLink === null) {
+          pop("Enter a valid ticket link starting with http:// or https://");
+          return;
+        }
+
         const ticket = {
           ticketNumber,
+          ticketLink,
           customerName: document.getElementById("cn").value,
           ticketFrom: document.getElementById("tf").value,
           shortDescription: document.getElementById("sd").value,
@@ -514,7 +545,7 @@
 
         tickets.push(ticket);
         save();
-        ["tn", "cn", "tf", "sd", "ad"].forEach((id) => {
+        ["tn", "cn", "ticket-link", "tf", "sd", "ad"].forEach((id) => {
           document.getElementById(id).value = "";
         });
         document.getElementById("st").value = "Assigned";
@@ -820,6 +851,7 @@
 
         ticketsToRender.forEach((ticket, visiblePosition) => {
           const index = tickets.indexOf(ticket);
+          const ticketLink = normalizeTicketLink(ticket.ticketLink);
           ticketList.innerHTML += `
             <tr
               class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
@@ -831,7 +863,9 @@
               ondragend="endTicketDrag()"
               onclick="toggle(${index})"
             >
-              <td>${ticket.ticketNumber}</td>
+              <td>${ticketLink
+                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="event.stopPropagation()">${ticket.ticketNumber}</a>`
+                : ticket.ticketNumber}</td>
               <td>${ticket.customerName}</td>
               <td>${ticket.status}</td>
               <td><span class="priority-badge ${priorityClass(ticket.priority)}">${ticket.priority}</span></td>

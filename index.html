@@ -762,19 +762,19 @@
         <div class="search-dialog-grid">
           <label for="filter-ticket-number">
             Ticket number
-            <input id="filter-ticket-number" aria-label="Search by ticket number" placeholder="Search ticket number..." oninput="resetTicketList()">
+            <input id="filter-ticket-number" aria-label="Search by ticket number" placeholder="Search ticket number...">
           </label>
           <label for="filter-customer">
             Customer name
-            <input id="filter-customer" aria-label="Search by customer name" placeholder="Search customer name..." oninput="resetTicketList()">
+            <input id="filter-customer" aria-label="Search by customer name" placeholder="Search customer name...">
           </label>
           <label for="filter-last-updated">
             Last updated date
-            <input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()">
+            <input id="filter-last-updated" type="date" aria-label="Filter by last updated date">
           </label>
           <label for="filter-status">
             Status
-            <select id="filter-status" aria-label="Filter by status" onchange="resetTicketList()">
+            <select id="filter-status" aria-label="Filter by status">
               <option value="">All statuses</option>
               <option>Assigned</option>
               <option>In Progress</option>
@@ -786,7 +786,7 @@
           </label>
           <label for="filter-priority">
             Priority
-            <select id="filter-priority" aria-label="Filter by priority" onchange="resetTicketList()">
+            <select id="filter-priority" aria-label="Filter by priority">
               <option value="">All priorities</option>
               <option>High</option>
               <option>Medium</option>
@@ -795,7 +795,7 @@
           </label>
           <label for="filter-ticket-from">
             Ticket source
-            <select id="filter-ticket-from" aria-label="Filter by ticket source" onchange="resetTicketList()">
+            <select id="filter-ticket-from" aria-label="Filter by ticket source">
               <option value="">All sources</option>
               <option value="AM">AM</option>
               <option value="PS">PS</option>
@@ -803,7 +803,7 @@
           </label>
           <label for="sort-tickets">
             Sort tickets
-            <select id="sort-tickets" aria-label="Sort tickets" onchange="resetTicketList()">
+            <select id="sort-tickets" aria-label="Sort tickets">
               <option value="">Manual order</option>
               <option value="newest">Last updated: newest to oldest</option>
               <option value="oldest">Last updated: oldest to newest</option>
@@ -814,7 +814,7 @@
         </div>
         <div class="search-dialog-actions">
           <button class="search-clear" type="button" onclick="clearTicketSearch()">Clear filters</button>
-          <button class="btn" type="button" onclick="closeTicketSearch()">Done</button>
+          <button class="btn" type="button" onclick="applyTicketSearch()">Done</button>
         </div>
       </dialog>
       <div class="table-container">
@@ -870,6 +870,15 @@
       let colorBlindMode = localStorage.getItem(colorBlindStorageKey) === "on";
       let activeCategory = "All";
       let visibleTicketLimit = ticketPageSize;
+      let appliedTicketSearch = {
+        ticketNumber: "",
+        customer: "",
+        lastUpdated: "",
+        status: "",
+        priority: "",
+        ticketFrom: "",
+        sort: "",
+      };
       let notificationQueue = [];
       let previousFocus = null;
       let draggedTicket = null;
@@ -1524,6 +1533,19 @@
         ].forEach((id) => {
           document.getElementById(id).value = "";
         });
+      }
+
+      function applyTicketSearch() {
+        appliedTicketSearch = {
+          ticketNumber: document.getElementById("filter-ticket-number").value.trim().toLowerCase(),
+          customer: document.getElementById("filter-customer").value.trim().toLowerCase(),
+          lastUpdated: document.getElementById("filter-last-updated").value,
+          status: document.getElementById("filter-status").value,
+          priority: document.getElementById("filter-priority").value,
+          ticketFrom: document.getElementById("filter-ticket-from").value,
+          sort: document.getElementById("sort-tickets").value,
+        };
+        closeTicketSearch();
         resetTicketList();
       }
 
@@ -1565,29 +1587,27 @@
       }
 
       function getVisibleTickets() {
-        const filterText = (id) => document.getElementById(id).value.trim().toLowerCase();
-        const filterStatus = document.getElementById("filter-status").value;
-        const filterPriority = document.getElementById("filter-priority").value;
-        const filterTicketFrom = document.getElementById("filter-ticket-from").value;
-        const filterLastUpdated = document.getElementById("filter-last-updated").value;
-        const sortTickets = document.getElementById("sort-tickets").value;
         const visibleTickets = tickets.filter((ticket) =>
-          ticket.ticketNumber.toLowerCase().includes(filterText("filter-ticket-number")) &&
-          (ticket.customerName || "").toLowerCase().includes(filterText("filter-customer")) &&
-          (!filterStatus || ticket.status === filterStatus) &&
-          (!filterPriority || ticket.priority === filterPriority) &&
-          (!filterTicketFrom || (ticket.ticketFrom || "").trim().toUpperCase() === filterTicketFrom) &&
-          matchesLocalDate(ticket.lastUpdateAt, filterLastUpdated) &&
+          ticket.ticketNumber.toLowerCase().includes(appliedTicketSearch.ticketNumber) &&
+          (ticket.customerName || "").toLowerCase().includes(appliedTicketSearch.customer) &&
+          (!appliedTicketSearch.status || ticket.status === appliedTicketSearch.status) &&
+          (!appliedTicketSearch.priority || ticket.priority === appliedTicketSearch.priority) &&
+          (!appliedTicketSearch.ticketFrom ||
+            (ticket.ticketFrom || "").trim().toUpperCase() === appliedTicketSearch.ticketFrom) &&
+          matchesLocalDate(ticket.lastUpdateAt, appliedTicketSearch.lastUpdated) &&
           matchesCategory(ticket)
         );
 
-        if (sortTickets === "newest" || sortTickets === "oldest") {
-          const direction = sortTickets === "newest" ? -1 : 1;
+        if (appliedTicketSearch.sort === "newest" || appliedTicketSearch.sort === "oldest") {
+          const direction = appliedTicketSearch.sort === "newest" ? -1 : 1;
           visibleTickets.sort((left, right) =>
             direction * (Date.parse(left.lastUpdateAt) - Date.parse(right.lastUpdateAt))
           );
-        } else if (sortTickets === "customer-asc" || sortTickets === "customer-desc") {
-          const direction = sortTickets === "customer-asc" ? 1 : -1;
+        } else if (
+          appliedTicketSearch.sort === "customer-asc" ||
+          appliedTicketSearch.sort === "customer-desc"
+        ) {
+          const direction = appliedTicketSearch.sort === "customer-asc" ? 1 : -1;
           visibleTickets.sort((left, right) =>
             direction * (left.customerName || "").localeCompare(
               right.customerName || "",
@@ -1681,7 +1701,7 @@
 
       function render() {
         const visibleTickets = getVisibleTickets();
-        const isSorted = document.getElementById("sort-tickets").value !== "";
+        const isSorted = appliedTicketSearch.sort !== "";
 
         document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
         updateTableWidth();

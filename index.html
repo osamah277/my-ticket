@@ -1119,6 +1119,8 @@
             const status = statusValue
               ? statusValue.toLowerCase() === "open"
                 ? "Assigned"
+                : statusValue.toLowerCase() === "staged"
+                  ? "Pending Vendor"
                 : ["pending", "pinding"].includes(statusValue.toLowerCase())
                   ? "Pending Customer"
                 : ["Assigned", "In Progress", "Pending Customer", "Pending Vendor", "Resolved", "Closed"]

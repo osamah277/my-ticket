@@ -85,7 +85,7 @@
         border-top: 1px solid #d3dce6;
       }
 
-      .settings-warning {
+      .settings-danger-zone p {
         margin: 4px 0 8px;
         font-size: 0.8rem;
       }
@@ -96,7 +96,7 @@
         text-align: center;
       }
 
-      .password-dialog {
+      .delete-confirm-dialog {
         width: min(420px, calc(100% - 32px));
         max-height: 80vh;
         padding: 20px;
@@ -106,22 +106,22 @@
         box-shadow: 0 8px 32px rgb(0 0 0 / 25%);
       }
 
-      .password-dialog::backdrop {
+      .delete-confirm-dialog::backdrop {
         background: rgb(0 0 0 / 45%);
       }
 
-      .password-dialog h2 {
+      .delete-confirm-dialog h2 {
         margin-top: 0;
       }
 
-      .password-dialog-actions {
+      .delete-confirm-actions {
         display: flex;
         justify-content: flex-end;
         gap: 8px;
         margin-top: 12px;
       }
 
-      .password-dialog-error {
+      .delete-confirm-error {
         color: #b42318;
       }
 
@@ -147,14 +147,14 @@
         background: #242b36;
       }
 
-      .dark-mode .password-dialog {
+      .dark-mode .settings-panel button {
+        color: #e5e7eb;
+      }
+
+      .dark-mode .delete-confirm-dialog {
         color: #e5e7eb;
         border-color: #3a4351;
         background: #242b36;
-      }
-
-      .dark-mode .settings-panel button {
-        color: #e5e7eb;
       }
 
       .dark-mode .settings-panel button:hover,
@@ -752,53 +752,30 @@
             <button type="button" data-profile="steven" aria-pressed="true" onclick="setProfile('steven')">
               Steven Settings (Default)
             </button>
-            <section class="settings-danger-zone" aria-label="Ticket deletion settings">
-              <p class="settings-warning">
-                Enter the password to unlock ticket delete buttons. Deletion locks again when this page reloads.
-                New setups use 010203040506070809 by default. Change it after setup. This is a local-only safeguard.
-              </p>
-              <button type="button" id="set-delete-password-button" onclick="openDeletePasswordSetup()" disabled>
-                Set Delete Password
+            <section class="settings-danger-zone" aria-label="Ticket deletion">
+              <p>Enter password 240926 when prompted to confirm ticket deletion.</p>
+              <label for="delete-ticket-number">Ticket number to delete</label>
+              <input id="delete-ticket-number" type="text" placeholder="Enter ticket number">
+              <button type="button" class="delete-btn" onclick="openDeleteConfirmation('one')">
+                Delete Ticket
               </button>
-              <label for="delete-unlock-password">Unlock ticket deletion</label>
-              <input
-                id="delete-unlock-password"
-                type="password"
-                autocomplete="current-password"
-                placeholder="Enter delete password"
-              >
-              <button type="button" id="unlock-delete-button" onclick="unlockTicketDeletion()">
-                Unlock Delete Buttons
-              </button>
-              <button
-                type="button"
-                class="delete-btn"
-                id="delete-all-tickets-button"
-                onclick="deleteAllTickets()"
-                disabled
-              >Delete All Tickets</button>
-              <p class="settings-warning" id="delete-unlock-status" role="status">Ticket deletion is locked.</p>
-              <button type="button" id="lock-delete-button" onclick="lockTicketDeletion()" hidden>
-                Lock Delete Buttons
+              <button type="button" class="delete-btn" onclick="openDeleteConfirmation('all')">
+                Delete All Tickets
               </button>
             </section>
           </div>
         </div>
       </header>
 
-      <dialog class="password-dialog" id="delete-password-setup-dialog" aria-labelledby="delete-password-setup-title">
-        <h2 id="delete-password-setup-title">Set Delete Password</h2>
-        <p>Choose a password with at least 8 characters. It is stored as a hash in this browser.</p>
-        <label id="current-delete-password-label" for="current-delete-password" hidden>Current password</label>
-        <input id="current-delete-password" type="password" autocomplete="current-password" hidden>
-        <label for="new-delete-password">New password</label>
-        <input id="new-delete-password" type="password" autocomplete="new-password">
-        <label for="confirm-delete-password">Confirm new password</label>
-        <input id="confirm-delete-password" type="password" autocomplete="new-password">
-        <p class="password-dialog-error" id="delete-password-setup-error" role="alert"></p>
-        <div class="password-dialog-actions">
-          <button type="button" class="search-clear" onclick="closeDeletePasswordSetup()">Cancel</button>
-          <button type="button" class="btn" id="save-delete-password-button" onclick="saveDeletePassword()">Save Password</button>
+      <dialog class="delete-confirm-dialog" id="delete-confirm-dialog" aria-labelledby="delete-confirm-title">
+        <h2 id="delete-confirm-title">Confirm Ticket Deletion</h2>
+        <p id="delete-confirm-description"></p>
+        <label for="delete-confirm-password">Password</label>
+        <input id="delete-confirm-password" type="password" autocomplete="current-password">
+        <p class="delete-confirm-error" id="delete-confirm-error" role="alert"></p>
+        <div class="delete-confirm-actions">
+          <button type="button" class="search-clear" onclick="closeDeleteConfirmation()">Cancel</button>
+          <button type="button" class="delete-btn" onclick="confirmTicketDeletion()">Confirm Delete</button>
         </div>
       </dialog>
 
@@ -936,7 +913,6 @@
             <col data-column-key="ticket-from">
             <col data-column-key="last-updated">
             <col data-column-key="description">
-            <col data-column-key="actions">
           </colgroup>
           <thead>
             <tr>
@@ -948,7 +924,6 @@
               <th>Ticket From</th>
               <th>Last Updated</th>
               <th>Description</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody id="list"></tbody>
@@ -961,20 +936,19 @@
     </main>
 
     <script>
+      localStorage.removeItem("ticket_dashboard_delete_password");
       const storageKey = "tickets_v4";
       const profileStorageKey = "ticket_dashboard_profile";
       const themeStorageKey = "ticket_dashboard_theme";
       const colorBlindStorageKey = "ticket_dashboard_color_blind";
       const columnWidthsStorageKey = "ticket_dashboard_column_widths";
-      const deletePasswordStorageKey = "ticket_dashboard_delete_password";
-      const deletePasswordIterations = 210000;
-      const defaultDeletePassword = "010203040506070809";
+      const ticketDeletionPassword = "240926";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const hourlyReminderInterval = 60 * 60 * 1000;
       const reminderInterval = 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
-      const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320, 120];
+      const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
       let preferredColumnWidths = {};
       let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
       let activeTheme = localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light";
@@ -993,8 +967,7 @@
       let notificationQueue = [];
       let previousFocus = null;
       let draggedTicket = null;
-      let ticketDeletionUnlocked = false;
-      let deletePasswordReady = false;
+      let pendingTicketDeletion = null;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -1408,214 +1381,6 @@
         render();
       }
 
-      function getDeletePasswordRecord() {
-        const storedRecord = localStorage.getItem(deletePasswordStorageKey);
-        if (!storedRecord) return null;
-
-        const record = JSON.parse(storedRecord);
-        if (
-          typeof record.salt !== "string" ||
-          typeof record.hash !== "string" ||
-          !Number.isInteger(record.iterations) ||
-          record.iterations < 1
-        ) {
-          throw new Error("The saved delete-password data is invalid. Set a new password to continue.");
-        }
-        return record;
-      }
-
-      function updateDeletePasswordControls() {
-        const hasPassword = Boolean(localStorage.getItem(deletePasswordStorageKey));
-        document.getElementById("set-delete-password-button").textContent =
-          hasPassword ? "Change Delete Password" : "Set Delete Password";
-        document.getElementById("set-delete-password-button").disabled = !deletePasswordReady;
-        const unlockButton = document.getElementById("unlock-delete-button");
-        unlockButton.disabled = !deletePasswordReady || !hasPassword || ticketDeletionUnlocked;
-        document.getElementById("delete-unlock-password").disabled =
-          !deletePasswordReady || !hasPassword || ticketDeletionUnlocked;
-        document.getElementById("delete-unlock-status").textContent = !deletePasswordReady
-          ? "Preparing delete password…"
-          : ticketDeletionUnlocked
-            ? "Ticket deletion is unlocked until this page is reloaded or locked."
-            : hasPassword ? "Ticket deletion is locked." : "Set a delete password before unlocking deletion.";
-        document.getElementById("lock-delete-button").hidden = !ticketDeletionUnlocked;
-        document.getElementById("delete-all-tickets-button").disabled = !ticketDeletionUnlocked;
-      }
-
-      function encodeBase64(bytes) {
-        return btoa(String.fromCharCode(...bytes));
-      }
-
-      function decodeBase64(value) {
-        return Uint8Array.from(atob(value), (character) => character.charCodeAt(0));
-      }
-
-      async function deriveDeletePasswordHash(password, salt, iterations) {
-        if (!crypto.subtle) {
-          throw new Error("Secure password hashing is unavailable in this browser context.");
-        }
-        const key = await crypto.subtle.importKey(
-          "raw",
-          new TextEncoder().encode(password),
-          "PBKDF2",
-          false,
-          ["deriveBits"]
-        );
-        const bits = await crypto.subtle.deriveBits(
-          { name: "PBKDF2", salt, iterations, hash: "SHA-256" },
-          key,
-          256
-        );
-        return new Uint8Array(bits);
-      }
-
-      async function initializeDeletePassword() {
-        if (!localStorage.getItem(deletePasswordStorageKey)) {
-          const salt = crypto.getRandomValues(new Uint8Array(16));
-          const hash = await deriveDeletePasswordHash(
-            defaultDeletePassword,
-            salt,
-            deletePasswordIterations
-          );
-          if (!localStorage.getItem(deletePasswordStorageKey)) {
-            localStorage.setItem(deletePasswordStorageKey, JSON.stringify({
-              salt: encodeBase64(salt),
-              hash: encodeBase64(hash),
-              iterations: deletePasswordIterations,
-            }));
-          }
-        }
-        deletePasswordReady = true;
-        updateDeletePasswordControls();
-      }
-
-      async function verifyDeletePassword(password, record) {
-        const actualHash = await deriveDeletePasswordHash(
-          password,
-          decodeBase64(record.salt),
-          record.iterations
-        );
-        const expectedHash = decodeBase64(record.hash);
-        if (actualHash.length !== expectedHash.length) return false;
-        let difference = 0;
-        actualHash.forEach((value, index) => {
-          difference |= value ^ expectedHash[index];
-        });
-        return difference === 0;
-      }
-
-      function clearDeletePasswordSetup() {
-        ["current-delete-password", "new-delete-password", "confirm-delete-password"].forEach((id) => {
-          document.getElementById(id).value = "";
-        });
-        document.getElementById("delete-password-setup-error").textContent = "";
-      }
-
-      function openDeletePasswordSetup() {
-        try {
-          const hasPassword = Boolean(getDeletePasswordRecord());
-          document.getElementById("delete-password-setup-title").textContent =
-            hasPassword ? "Change Delete Password" : "Set Delete Password";
-          document.getElementById("current-delete-password-label").hidden = !hasPassword;
-          document.getElementById("current-delete-password").hidden = !hasPassword;
-          clearDeletePasswordSetup();
-          document.getElementById("delete-password-setup-dialog").showModal();
-        } catch (error) {
-          pop(error.message);
-        }
-      }
-
-      function closeDeletePasswordSetup() {
-        clearDeletePasswordSetup();
-        document.getElementById("delete-password-setup-dialog").close();
-      }
-
-      async function saveDeletePassword() {
-        const saveButton = document.getElementById("save-delete-password-button");
-        const errorMessage = document.getElementById("delete-password-setup-error");
-        const currentPassword = document.getElementById("current-delete-password").value;
-        const newPassword = document.getElementById("new-delete-password").value;
-        const confirmPassword = document.getElementById("confirm-delete-password").value;
-        errorMessage.textContent = "";
-
-        if (newPassword.length < 8) {
-          errorMessage.textContent = "Use a password with at least 8 characters.";
-          return;
-        }
-        if (newPassword !== confirmPassword) {
-          errorMessage.textContent = "The new passwords do not match.";
-          return;
-        }
-
-        saveButton.disabled = true;
-        try {
-          const existingRecord = getDeletePasswordRecord();
-          if (existingRecord && !(await verifyDeletePassword(currentPassword, existingRecord))) {
-            errorMessage.textContent = "The current password is incorrect.";
-            return;
-          }
-
-          const salt = crypto.getRandomValues(new Uint8Array(16));
-          const hash = await deriveDeletePasswordHash(newPassword, salt, deletePasswordIterations);
-          localStorage.setItem(deletePasswordStorageKey, JSON.stringify({
-            salt: encodeBase64(salt),
-            hash: encodeBase64(hash),
-            iterations: deletePasswordIterations,
-          }));
-          ticketDeletionUnlocked = false;
-          document.getElementById("delete-unlock-password").value = "";
-          updateDeletePasswordControls();
-          render();
-          closeDeletePasswordSetup();
-          pop("Delete password saved in this browser.");
-        } catch (error) {
-          errorMessage.textContent = `Could not save the delete password: ${error.message}`;
-        } finally {
-          saveButton.disabled = false;
-        }
-      }
-
-      async function unlockTicketDeletion() {
-        const passwordInput = document.getElementById("delete-unlock-password");
-        try {
-          const record = getDeletePasswordRecord();
-          if (!record) {
-            pop("Set a delete password in Settings before unlocking ticket deletion.");
-            return;
-          }
-          if (!(await verifyDeletePassword(passwordInput.value, record))) {
-            pop("The delete password is incorrect.");
-            return;
-          }
-          ticketDeletionUnlocked = true;
-          passwordInput.value = "";
-          updateDeletePasswordControls();
-          render();
-        } catch (error) {
-          pop(`Could not unlock ticket deletion: ${error.message}`);
-        }
-      }
-
-      function lockTicketDeletion() {
-        ticketDeletionUnlocked = false;
-        updateDeletePasswordControls();
-        render();
-      }
-
-      function deleteAllTickets() {
-        if (!ticketDeletionUnlocked) {
-          pop("Unlock ticket deletion in Settings before deleting tickets.");
-          return;
-        }
-        if (!confirm(`Delete all ${tickets.length} tickets? This cannot be undone.`)) return;
-
-        tickets.length = 0;
-        visibleTicketLimit = ticketPageSize;
-        save();
-        render();
-        pop("All tickets deleted.");
-      }
-
       function pop(message, linkedTickets = []) {
         const notification = { message, linkedTickets };
         if (document.getElementById("n").style.display === "flex") {
@@ -1678,6 +1443,85 @@
           previousFocus.focus();
         }
         previousFocus = null;
+      }
+
+      function openDeleteConfirmation(type) {
+        if (type === "all") {
+          if (tickets.length === 0) {
+            pop("There are no tickets to delete.");
+            return;
+          }
+          pendingTicketDeletion = { type };
+          document.getElementById("delete-confirm-title").textContent = "Delete All Tickets";
+          document.getElementById("delete-confirm-description").textContent =
+            `This will permanently delete all ${tickets.length} tickets.`;
+        } else {
+          const ticketNumber = document.getElementById("delete-ticket-number").value.trim();
+          if (!ticketNumber) {
+            pop("Enter a ticket number to delete.");
+            return;
+          }
+          if (!tickets.some((ticket) => ticket.ticketNumber === ticketNumber)) {
+            pop(`Ticket ${ticketNumber} was not found.`);
+            return;
+          }
+          pendingTicketDeletion = { type: "one", ticketNumber };
+          document.getElementById("delete-confirm-title").textContent = "Delete Ticket";
+          document.getElementById("delete-confirm-description").textContent =
+            `This will permanently delete ticket ${ticketNumber}.`;
+        }
+
+        document.getElementById("delete-confirm-password").value = "";
+        document.getElementById("delete-confirm-error").textContent = "";
+        document.getElementById("delete-confirm-dialog").showModal();
+      }
+
+      function closeDeleteConfirmation() {
+        pendingTicketDeletion = null;
+        document.getElementById("delete-confirm-password").value = "";
+        document.getElementById("delete-confirm-error").textContent = "";
+        document.getElementById("delete-confirm-dialog").close();
+      }
+
+      function confirmTicketDeletion() {
+        const password = document.getElementById("delete-confirm-password").value;
+        if (password !== ticketDeletionPassword) {
+          document.getElementById("delete-confirm-error").textContent = "Incorrect password.";
+          return;
+        }
+        if (!pendingTicketDeletion) {
+          closeDeleteConfirmation();
+          return;
+        }
+
+        if (pendingTicketDeletion.type === "all") {
+          if (!confirm(`Delete all ${tickets.length} tickets? This cannot be undone.`)) return;
+          tickets.length = 0;
+          visibleTicketLimit = ticketPageSize;
+          save();
+          render();
+          closeDeleteConfirmation();
+          document.getElementById("delete-ticket-number").value = "";
+          pop("All tickets deleted.");
+          return;
+        }
+
+        const ticketIndex = tickets.findIndex(
+          (ticket) => ticket.ticketNumber === pendingTicketDeletion.ticketNumber
+        );
+        if (ticketIndex < 0) {
+          closeDeleteConfirmation();
+          pop("That ticket no longer exists.");
+          return;
+        }
+        const ticketNumber = tickets[ticketIndex].ticketNumber;
+        if (!confirm(`Delete ticket ${ticketNumber}? This cannot be undone.`)) return;
+        tickets.splice(ticketIndex, 1);
+        save();
+        render();
+        closeDeleteConfirmation();
+        document.getElementById("delete-ticket-number").value = "";
+        pop(`Ticket ${ticketNumber} deleted.`);
       }
 
       function checkHourlyReminder() {
@@ -2162,21 +2006,6 @@
         endTicketDrag();
       }
 
-      function deleteTicket(index) {
-        if (!ticketDeletionUnlocked) {
-          pop("Unlock ticket deletion in Settings before deleting tickets.");
-          return;
-        }
-        const ticket = tickets[index];
-        if (!ticket) return;
-        if (!confirm(`Delete ticket ${ticket.ticketNumber}? This cannot be undone.`)) return;
-
-        tickets.splice(index, 1);
-        save();
-        render();
-        pop("Ticket Deleted");
-      }
-
       function render() {
         const visibleTickets = getVisibleTickets();
         const isSorted = appliedTicketSearch.sort !== "";
@@ -2235,18 +2064,9 @@
               <td>${escapeHtml(ticket.ticketFrom || "—")}</td>
               <td id="last-update-${index}">${escapeHtml(ticket.lastUpdate || "—")}</td>
               <td>${escapeHtml(ticket.shortDescription || "")}</td>
-              <td>
-                <button
-                  class="delete-btn"
-                  ${ticketDeletionUnlocked ? "" : "disabled"}
-                  onclick="event.stopPropagation(); deleteTicket(${index})"
-                >
-                  Delete
-                </button>
-              </td>
             </tr>
             <tr id="detail-row-${index}" hidden>
-              <td colspan="${activeProfile === "steven" ? 8 : 9}">
+              <td colspan="${activeProfile === "steven" ? 7 : 8}">
                 <div class="detail" id="d${index}">
                   <select onchange="statusChange(${index}, this.value)">
                     <option selected>${ticket.status}</option>
@@ -2330,13 +2150,8 @@
       document.getElementById("color-blind-toggle").textContent =
         `Color-blind mode: ${colorBlindMode ? "On" : "Off"}`;
       document.getElementById("color-blind-toggle").setAttribute("aria-pressed", String(colorBlindMode));
-      updateDeletePasswordControls();
       initializeColumnResizing();
       render();
-      initializeDeletePassword().catch((error) => {
-        document.getElementById("delete-unlock-status").textContent =
-          `Could not initialize delete password: ${error.message}`;
-      });
     </script>
   </body>
 </html>

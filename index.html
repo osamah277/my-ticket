@@ -1025,7 +1025,8 @@
               if (!ticketNumber) errors.push(`Row ${rowIndex + 2}: missing DisplayID.`);
               else if (!priority) errors.push(`Row ${rowIndex + 2}: Priority must be High, Medium, or Low.`);
               else if (!status) errors.push(`Row ${rowIndex + 2}: unsupported Status "${statusValue}".`);
-              continue;
+              else errors.push(`Row ${rowIndex + 2}: duplicate DisplayID "${ticketNumber}".`);
+              return;
             }
 
             const modifiedValue = modifiedColumn < 0 ? "" : (values[modifiedColumn] || "").trim();
@@ -1033,7 +1034,7 @@
             if (!Number.isFinite(modifiedAt)) {
               skippedCount += 1;
               errors.push(`Row ${rowIndex + 2}: invalid Last Modified date "${modifiedValue}".`);
-              continue;
+              return;
             }
 
             const updatedAt = new Date(modifiedAt);

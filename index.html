@@ -90,10 +90,16 @@
         font-size: 0.8rem;
       }
 
-      .settings-danger-zone .delete-btn {
+      .settings-panel .settings-danger-zone button.delete-btn {
         width: 100%;
         margin-top: 6px;
+        color: #fff;
+        background: #c0392b;
         text-align: center;
+      }
+
+      .settings-panel .settings-danger-zone button.delete-btn:hover {
+        background: #a93226;
       }
 
       .delete-confirm-dialog {
@@ -753,7 +759,6 @@
               Steven Settings (Default)
             </button>
             <section class="settings-danger-zone" aria-label="Ticket deletion">
-              <p>Enter password 240926 when prompted to confirm ticket deletion.</p>
               <label for="delete-ticket-number">Ticket number to delete</label>
               <input id="delete-ticket-number" type="text" placeholder="Enter ticket number">
               <button type="button" class="delete-btn" onclick="openDeleteConfirmation('one')">

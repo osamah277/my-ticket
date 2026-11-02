@@ -755,9 +755,9 @@
             <section class="settings-danger-zone" aria-label="Ticket deletion settings">
               <p class="settings-warning">
                 Enter the password to unlock ticket delete buttons. Deletion locks again when this page reloads.
-                This is a local-only safeguard.
+                New setups use 010203040506070809 by default. Change it after setup. This is a local-only safeguard.
               </p>
-              <button type="button" id="set-delete-password-button" onclick="openDeletePasswordSetup()">
+              <button type="button" id="set-delete-password-button" onclick="openDeletePasswordSetup()" disabled>
                 Set Delete Password
               </button>
               <label for="delete-unlock-password">Unlock ticket deletion</label>
@@ -968,6 +968,7 @@
       const columnWidthsStorageKey = "ticket_dashboard_column_widths";
       const deletePasswordStorageKey = "ticket_dashboard_delete_password";
       const deletePasswordIterations = 210000;
+      const defaultDeletePassword = "010203040506070809";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const hourlyReminderInterval = 60 * 60 * 1000;
       const reminderInterval = 24 * 60 * 60 * 1000;
@@ -993,6 +994,7 @@
       let previousFocus = null;
       let draggedTicket = null;
       let ticketDeletionUnlocked = false;
+      let deletePasswordReady = false;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -1424,13 +1426,16 @@
         const hasPassword = Boolean(localStorage.getItem(deletePasswordStorageKey));
         document.getElementById("set-delete-password-button").textContent =
           hasPassword ? "Change Delete Password" : "Set Delete Password";
+        document.getElementById("set-delete-password-button").disabled = !deletePasswordReady;
         const unlockButton = document.getElementById("unlock-delete-button");
-        unlockButton.disabled = !hasPassword || ticketDeletionUnlocked;
+        unlockButton.disabled = !deletePasswordReady || !hasPassword || ticketDeletionUnlocked;
         document.getElementById("delete-unlock-password").disabled =
-          !hasPassword || ticketDeletionUnlocked;
-        document.getElementById("delete-unlock-status").textContent = ticketDeletionUnlocked
-          ? "Ticket deletion is unlocked until this page is reloaded or locked."
-          : hasPassword ? "Ticket deletion is locked." : "Set a delete password before unlocking deletion.";
+          !deletePasswordReady || !hasPassword || ticketDeletionUnlocked;
+        document.getElementById("delete-unlock-status").textContent = !deletePasswordReady
+          ? "Preparing delete password…"
+          : ticketDeletionUnlocked
+            ? "Ticket deletion is unlocked until this page is reloaded or locked."
+            : hasPassword ? "Ticket deletion is locked." : "Set a delete password before unlocking deletion.";
         document.getElementById("lock-delete-button").hidden = !ticketDeletionUnlocked;
         document.getElementById("delete-all-tickets-button").disabled = !ticketDeletionUnlocked;
       }
@@ -1460,6 +1465,26 @@
           256
         );
         return new Uint8Array(bits);
+      }
+
+      async function initializeDeletePassword() {
+        if (!localStorage.getItem(deletePasswordStorageKey)) {
+          const salt = crypto.getRandomValues(new Uint8Array(16));
+          const hash = await deriveDeletePasswordHash(
+            defaultDeletePassword,
+            salt,
+            deletePasswordIterations
+          );
+          if (!localStorage.getItem(deletePasswordStorageKey)) {
+            localStorage.setItem(deletePasswordStorageKey, JSON.stringify({
+              salt: encodeBase64(salt),
+              hash: encodeBase64(hash),
+              iterations: deletePasswordIterations,
+            }));
+          }
+        }
+        deletePasswordReady = true;
+        updateDeletePasswordControls();
       }
 
       async function verifyDeletePassword(password, record) {
@@ -2306,6 +2331,10 @@
       updateDeletePasswordControls();
       initializeColumnResizing();
       render();
+      initializeDeletePassword().catch((error) => {
+        document.getElementById("delete-unlock-status").textContent =
+          `Could not initialize delete password: ${error.message}`;
+      });
     </script>
   </body>
 </html>

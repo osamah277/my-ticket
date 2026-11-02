@@ -733,7 +733,14 @@
                   <option value="PS">PS</option>
                 </select>
               </th>
-              <th><input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()"></th>
+              <th>
+                <input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()">
+                <select id="sort-last-updated" aria-label="Sort by last updated" onchange="resetTicketList()">
+                  <option value="">Manual order</option>
+                  <option value="newest">Newest to oldest</option>
+                  <option value="oldest">Oldest to newest</option>
+                </select>
+              </th>
               <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
               <th></th>
             </tr>
@@ -1439,16 +1446,26 @@
         const filterPriority = document.getElementById("filter-priority").value;
         const filterTicketFrom = document.getElementById("filter-ticket-from").value;
         const filterLastUpdated = document.getElementById("filter-last-updated").value;
-        return tickets.filter((ticket) =>
+        const sortLastUpdated = document.getElementById("sort-last-updated").value;
+        const visibleTickets = tickets.filter((ticket) =>
           ticket.ticketNumber.toLowerCase().includes(filterText("filter-ticket-number")) &&
           (ticket.customerName || "").toLowerCase().includes(filterText("filter-customer")) &&
           (!filterStatus || ticket.status === filterStatus) &&
           (!filterPriority || ticket.priority === filterPriority) &&
           (!filterTicketFrom || (ticket.ticketFrom || "").trim().toUpperCase() === filterTicketFrom) &&
-          matchesLocalDate(ticket.lastUpdate, filterLastUpdated) &&
+          matchesLocalDate(ticket.lastUpdateAt, filterLastUpdated) &&
           (ticket.shortDescription || "").toLowerCase().includes(filterText("filter-description")) &&
           matchesCategory(ticket)
         );
+
+        if (sortLastUpdated === "newest" || sortLastUpdated === "oldest") {
+          const direction = sortLastUpdated === "newest" ? -1 : 1;
+          visibleTickets.sort((left, right) =>
+            direction * (Date.parse(left.lastUpdateAt) - Date.parse(right.lastUpdateAt))
+          );
+        }
+
+        return visibleTickets;
       }
 
       function moveTicketToPosition(index, requestedPosition) {
@@ -1532,6 +1549,7 @@
 
       function render() {
         const visibleTickets = getVisibleTickets();
+        const isDateSorted = document.getElementById("sort-last-updated").value !== "";
 
         document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
         updateTableWidth();
@@ -1556,7 +1574,7 @@
           ticketList.innerHTML += `
             <tr
               class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
-              draggable="true"
+              draggable="${!isDateSorted}"
               ondragstart="startTicketDrag(event, ${index})"
               ondragover="dragOverTicket(event)"
               ondragleave="event.currentTarget.classList.remove('ticket-row-drop-target')"
@@ -1571,6 +1589,7 @@
                   min="1"
                   max="${visibleTickets.length}"
                   value="${visiblePosition + 1}"
+                  ${isDateSorted ? "disabled" : ""}
                   aria-label="Position for ticket ${ticket.ticketNumber}"
                   title="1 is the top; ${visibleTickets.length} moves to the bottom"
                   onchange="event.stopPropagation(); moveTicketToPosition(${index}, this.value)"

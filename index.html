@@ -754,18 +754,33 @@
             </button>
             <section class="settings-danger-zone" aria-label="Ticket deletion settings">
               <p class="settings-warning">
-                Local-only password safeguard; it does not protect against access to this browser's data.
+                Enter the password to unlock ticket delete buttons. Deletion locks again when this page reloads.
+                This is a local-only safeguard.
               </p>
               <button type="button" id="set-delete-password-button" onclick="openDeletePasswordSetup()">
                 Set Delete Password
+              </button>
+              <label for="delete-unlock-password">Unlock ticket deletion</label>
+              <input
+                id="delete-unlock-password"
+                type="password"
+                autocomplete="current-password"
+                placeholder="Enter delete password"
+              >
+              <button type="button" id="unlock-delete-button" onclick="unlockTicketDeletion()">
+                Unlock Delete Buttons
               </button>
               <button
                 type="button"
                 class="delete-btn"
                 id="delete-all-tickets-button"
-                onclick="openDeleteAllTicketsDialog()"
+                onclick="deleteAllTickets()"
                 disabled
               >Delete All Tickets</button>
+              <p class="settings-warning" id="delete-unlock-status" role="status">Ticket deletion is locked.</p>
+              <button type="button" id="lock-delete-button" onclick="lockTicketDeletion()" hidden>
+                Lock Delete Buttons
+              </button>
             </section>
           </div>
         </div>
@@ -784,18 +799,6 @@
         <div class="password-dialog-actions">
           <button type="button" class="search-clear" onclick="closeDeletePasswordSetup()">Cancel</button>
           <button type="button" class="btn" id="save-delete-password-button" onclick="saveDeletePassword()">Save Password</button>
-        </div>
-      </dialog>
-
-      <dialog class="password-dialog" id="delete-all-tickets-dialog" aria-labelledby="delete-all-tickets-title">
-        <h2 id="delete-all-tickets-title">Delete All Tickets</h2>
-        <p>Enter the delete password to continue. You will be asked to confirm before tickets are removed.</p>
-        <label for="delete-all-password">Delete password</label>
-        <input id="delete-all-password" type="password" autocomplete="current-password">
-        <p class="password-dialog-error" id="delete-all-tickets-error" role="alert"></p>
-        <div class="password-dialog-actions">
-          <button type="button" class="search-clear" onclick="closeDeleteAllTicketsDialog()">Cancel</button>
-          <button type="button" class="delete-btn" id="confirm-delete-all-tickets-button" onclick="deleteAllTickets()">Continue</button>
         </div>
       </dialog>
 
@@ -989,6 +992,7 @@
       let notificationQueue = [];
       let previousFocus = null;
       let draggedTicket = null;
+      let ticketDeletionUnlocked = false;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -1420,7 +1424,15 @@
         const hasPassword = Boolean(localStorage.getItem(deletePasswordStorageKey));
         document.getElementById("set-delete-password-button").textContent =
           hasPassword ? "Change Delete Password" : "Set Delete Password";
-        document.getElementById("delete-all-tickets-button").disabled = !hasPassword;
+        const unlockButton = document.getElementById("unlock-delete-button");
+        unlockButton.disabled = !hasPassword || ticketDeletionUnlocked;
+        document.getElementById("delete-unlock-password").disabled =
+          !hasPassword || ticketDeletionUnlocked;
+        document.getElementById("delete-unlock-status").textContent = ticketDeletionUnlocked
+          ? "Ticket deletion is unlocked until this page is reloaded or locked."
+          : hasPassword ? "Ticket deletion is locked." : "Set a delete password before unlocking deletion.";
+        document.getElementById("lock-delete-button").hidden = !ticketDeletionUnlocked;
+        document.getElementById("delete-all-tickets-button").disabled = !ticketDeletionUnlocked;
       }
 
       function encodeBase64(bytes) {
@@ -1523,7 +1535,10 @@
             hash: encodeBase64(hash),
             iterations: deletePasswordIterations,
           }));
+          ticketDeletionUnlocked = false;
+          document.getElementById("delete-unlock-password").value = "";
           updateDeletePasswordControls();
+          render();
           closeDeletePasswordSetup();
           pop("Delete password saved in this browser.");
         } catch (error) {
@@ -1533,52 +1548,45 @@
         }
       }
 
-      function closeDeleteAllTicketsDialog() {
-        document.getElementById("delete-all-password").value = "";
-        document.getElementById("delete-all-tickets-error").textContent = "";
-        document.getElementById("delete-all-tickets-dialog").close();
-      }
-
-      function openDeleteAllTicketsDialog() {
-        try {
-          if (!getDeletePasswordRecord()) {
-            pop("Set a delete password in Settings before deleting all tickets.");
-            return;
-          }
-          document.getElementById("delete-all-password").value = "";
-          document.getElementById("delete-all-tickets-error").textContent = "";
-          document.getElementById("delete-all-tickets-dialog").showModal();
-        } catch (error) {
-          pop(error.message);
-        }
-      }
-
-      async function deleteAllTickets() {
-        const confirmButton = document.getElementById("confirm-delete-all-tickets-button");
-        const errorMessage = document.getElementById("delete-all-tickets-error");
-        const password = document.getElementById("delete-all-password").value;
-        errorMessage.textContent = "";
-        confirmButton.disabled = true;
-
+      async function unlockTicketDeletion() {
+        const passwordInput = document.getElementById("delete-unlock-password");
         try {
           const record = getDeletePasswordRecord();
-          if (!record || !(await verifyDeletePassword(password, record))) {
-            errorMessage.textContent = "The delete password is incorrect.";
+          if (!record) {
+            pop("Set a delete password in Settings before unlocking ticket deletion.");
             return;
           }
-          if (!confirm(`Delete all ${tickets.length} tickets? This cannot be undone.`)) return;
-
-          tickets.length = 0;
-          visibleTicketLimit = ticketPageSize;
-          save();
+          if (!(await verifyDeletePassword(passwordInput.value, record))) {
+            pop("The delete password is incorrect.");
+            return;
+          }
+          ticketDeletionUnlocked = true;
+          passwordInput.value = "";
+          updateDeletePasswordControls();
           render();
-          closeDeleteAllTicketsDialog();
-          pop("All tickets deleted.");
         } catch (error) {
-          errorMessage.textContent = `Could not delete tickets: ${error.message}`;
-        } finally {
-          confirmButton.disabled = false;
+          pop(`Could not unlock ticket deletion: ${error.message}`);
         }
+      }
+
+      function lockTicketDeletion() {
+        ticketDeletionUnlocked = false;
+        updateDeletePasswordControls();
+        render();
+      }
+
+      function deleteAllTickets() {
+        if (!ticketDeletionUnlocked) {
+          pop("Unlock ticket deletion in Settings before deleting tickets.");
+          return;
+        }
+        if (!confirm(`Delete all ${tickets.length} tickets? This cannot be undone.`)) return;
+
+        tickets.length = 0;
+        visibleTicketLimit = ticketPageSize;
+        save();
+        render();
+        pop("All tickets deleted.");
       }
 
       function pop(message, linkedTickets = []) {
@@ -2128,6 +2136,10 @@
       }
 
       function deleteTicket(index) {
+        if (!ticketDeletionUnlocked) {
+          pop("Unlock ticket deletion in Settings before deleting tickets.");
+          return;
+        }
         const ticket = tickets[index];
         if (!ticket) return;
         if (!confirm(`Delete ticket ${ticket.ticketNumber}? This cannot be undone.`)) return;
@@ -2197,7 +2209,11 @@
               <td id="last-update-${index}">${escapeHtml(ticket.lastUpdate || "—")}</td>
               <td>${escapeHtml(ticket.shortDescription || "")}</td>
               <td>
-                <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">
+                <button
+                  class="delete-btn"
+                  ${ticketDeletionUnlocked ? "" : "disabled"}
+                  onclick="event.stopPropagation(); deleteTicket(${index})"
+                >
                   Delete
                 </button>
               </td>

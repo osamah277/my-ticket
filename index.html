@@ -752,6 +752,16 @@
       </div>
 
       <div class="ticket-tools">
+        <input
+          id="csv-file"
+          type="file"
+          accept=".csv,text/csv"
+          hidden
+          onchange="importTicketsFromCsv(event)"
+        >
+        <button class="btn" type="button" onclick="document.getElementById('csv-file').click()">
+          Import CSV
+        </button>
         <button class="btn" type="button" onclick="openTicketSearch()">Search and filter tickets</button>
       </div>
       <dialog class="search-dialog" id="ticket-search-dialog" aria-labelledby="ticket-search-title">
@@ -925,6 +935,145 @@
 
       function save() {
         localStorage.setItem(storageKey, JSON.stringify(tickets));
+      }
+
+      function parseCsv(text) {
+        const rows = [];
+        let row = [];
+        let field = "";
+        let inQuotes = false;
+
+        for (let index = 0; index < text.length; index += 1) {
+          const character = text[index];
+          if (inQuotes) {
+            if (character === '"' && text[index + 1] === '"') {
+              field += '"';
+              index += 1;
+            } else if (character === '"') {
+              inQuotes = false;
+            } else {
+              field += character;
+            }
+          } else if (character === '"' && field.length === 0) {
+            inQuotes = true;
+          } else if (character === ",") {
+            row.push(field);
+            field = "";
+          } else if (character === "\n" || character === "\r") {
+            row.push(field);
+            if (row.some((value) => value.trim() !== "")) rows.push(row);
+            row = [];
+            field = "";
+            if (character === "\r" && text[index + 1] === "\n") index += 1;
+          } else {
+            field += character;
+          }
+        }
+
+        if (inQuotes) throw new Error("The CSV contains an unclosed quoted field.");
+        row.push(field);
+        if (row.some((value) => value.trim() !== "")) rows.push(row);
+        return rows;
+      }
+
+      function normalizeCsvHeader(header) {
+        return header.trim().toLowerCase().replace(/[^a-z0-9]/g, "");
+      }
+
+      function importTicketsFromCsv(event) {
+        const fileInput = event.currentTarget;
+        const file = fileInput.files[0];
+        if (!file) return;
+
+        file.text().then((text) => {
+          const rows = parseCsv(text.replace(/^\uFEFF/, ""));
+          if (rows.length < 2) throw new Error("The CSV must include a header row and at least one ticket.");
+
+          const headers = rows[0].map(normalizeCsvHeader);
+          const findColumn = (...names) => headers.findIndex((header) => names.includes(header));
+          const ticketNumberColumn = findColumn("displayid", "tasknumber", "ticketnumber");
+          const priorityColumn = findColumn("priority");
+          if (ticketNumberColumn < 0 || priorityColumn < 0) {
+            throw new Error("CSV headers must include DisplayID (task number) and Priority.");
+          }
+
+          const descriptionColumn = findColumn("summary", "summry", "description", "shortdescription");
+          const customerColumn = findColumn("customerfullname", "customername", "custmerfullname");
+          const statusColumn = findColumn("status", "stats");
+          const modifiedColumn = findColumn("lastmodified", "lastupdated", "lastupdate");
+          const knownNumbers = new Set(tickets.map((ticket) => ticket.ticketNumber));
+          let importedCount = 0;
+          let skippedCount = 0;
+          const errors = [];
+
+          rows.slice(1).forEach((values, rowIndex) => {
+            const ticketNumber = (values[ticketNumberColumn] || "").trim();
+            const priorityValue = (values[priorityColumn] || "").trim().toLowerCase();
+            const priority = ["high", "medium", "low"].includes(priorityValue)
+              ? priorityValue[0].toUpperCase() + priorityValue.slice(1)
+              : "";
+            const statusValue = statusColumn < 0 ? "" : (values[statusColumn] || "").trim();
+            const status = statusValue
+              ? statusValue.toLowerCase() === "open"
+                ? "Assigned"
+                : ["Assigned", "In Progress", "Pending Customer", "Pending Vendor", "Resolved", "Closed"]
+                  .find((value) => value.toLowerCase() === statusValue.toLowerCase())
+              : "Assigned";
+
+            if (!ticketNumber || !priority || !status || knownNumbers.has(ticketNumber)) {
+              skippedCount += 1;
+              if (!ticketNumber) errors.push(`Row ${rowIndex + 2}: missing DisplayID.`);
+              else if (!priority) errors.push(`Row ${rowIndex + 2}: Priority must be High, Medium, or Low.`);
+              else if (!status) errors.push(`Row ${rowIndex + 2}: unsupported Status "${statusValue}".`);
+              continue;
+            }
+
+            const modifiedValue = modifiedColumn < 0 ? "" : (values[modifiedColumn] || "").trim();
+            const modifiedAt = modifiedValue ? Date.parse(modifiedValue) : Date.now();
+            if (!Number.isFinite(modifiedAt)) {
+              skippedCount += 1;
+              errors.push(`Row ${rowIndex + 2}: invalid Last Modified date "${modifiedValue}".`);
+              continue;
+            }
+
+            const updatedAt = new Date(modifiedAt);
+            const updatedAtIso = updatedAt.toISOString();
+            const ticket = {
+              ticketNumber,
+              ticketLink: "",
+              customerName: customerColumn < 0 ? "" : (values[customerColumn] || "").trim(),
+              ticketFrom: "",
+              shortDescription: descriptionColumn < 0 ? "" : (values[descriptionColumn] || "").trim(),
+              assignedDate: "",
+              status,
+              priority,
+              createdAt: updatedAtIso,
+              lastUpdateAt: updatedAtIso,
+              lastUpdate: formatLastUpdate(updatedAt),
+              nextHourlyReminderAt: new Date(Date.now() + hourlyReminderInterval).toISOString(),
+              notes: [],
+            };
+            if (needsStatusReminder(status)) {
+              ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
+            }
+            tickets.push(ticket);
+            knownNumbers.add(ticketNumber);
+            importedCount += 1;
+          });
+
+          if (importedCount) {
+            save();
+            visibleTicketLimit = Math.max(visibleTicketLimit, tickets.length);
+            render();
+          }
+          const result = `Imported ${importedCount} ticket${importedCount === 1 ? "" : "s"}.`
+            + (skippedCount ? ` Skipped ${skippedCount} row${skippedCount === 1 ? "" : "s"}.` : "");
+          pop(errors.length ? `${result} ${errors.slice(0, 3).join(" ")}` : result);
+        }).catch((error) => {
+          pop(`Could not import CSV: ${error.message}`);
+        }).finally(() => {
+          fileInput.value = "";
+        });
       }
 
       function updateTableWidth() {
@@ -1284,6 +1433,15 @@
           "<": "&lt;",
           ">": "&gt;",
           "'": "&#39;",
+        })[character]);
+      }
+
+      function escapeHtml(value) {
+        return value.replace(/[&<>"]/g, (character) => ({
+          "&": "&amp;",
+          "<": "&lt;",
+          ">": "&gt;",
+          '"': "&quot;",
         })[character]);
       }
 
@@ -1742,21 +1900,21 @@
                   max="${visibleTickets.length}"
                   value="${visiblePosition + 1}"
                   ${isSorted ? "disabled" : ""}
-                  aria-label="Position for ticket ${ticket.ticketNumber}"
+                  aria-label="Position for ticket ${escapeAttribute(ticket.ticketNumber)}"
                   title="1 is the top; ${visibleTickets.length} moves to the bottom"
                   onchange="event.stopPropagation(); moveTicketToPosition(${index}, this.value)"
                   onclick="event.stopPropagation()"
                 >
               </td>
               <td>${ticketLink
-                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="openTicket(event, ${index})">${ticket.ticketNumber}</a>`
-                : ticket.ticketNumber}</td>
-              <td>${ticket.customerName}</td>
-              <td>${ticket.status}</td>
+                ? `<a href="${escapeAttribute(ticketLink)}" target="_blank" rel="noopener noreferrer" onclick="openTicket(event, ${index})">${escapeHtml(ticket.ticketNumber)}</a>`
+                : escapeHtml(ticket.ticketNumber)}</td>
+              <td>${escapeHtml(ticket.customerName || "")}</td>
+              <td>${escapeHtml(ticket.status || "")}</td>
               <td><span class="priority-badge ${priorityClass(ticket.priority)}">${ticket.priority}</span></td>
-              <td>${ticket.ticketFrom || "—"}</td>
-              <td id="last-update-${index}">${ticket.lastUpdate || "—"}</td>
-              <td>${ticket.shortDescription}</td>
+              <td>${escapeHtml(ticket.ticketFrom || "—")}</td>
+              <td id="last-update-${index}">${escapeHtml(ticket.lastUpdate || "—")}</td>
+              <td>${escapeHtml(ticket.shortDescription || "")}</td>
               <td>
                 <button class="delete-btn" onclick="event.stopPropagation(); deleteTicket(${index})">
                   Delete

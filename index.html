@@ -95,6 +95,12 @@
         background: #242b36;
       }
 
+      .dark-mode .search-dialog {
+        color: #e5e7eb;
+        border-color: #3a4351;
+        background: #242b36;
+      }
+
       .dark-mode .settings-panel button {
         color: #e5e7eb;
       }
@@ -480,11 +486,74 @@
         user-select: none;
       }
 
-      .column-filters input,
-      .column-filters select {
-        min-width: 0;
+      .ticket-tools {
+        display: flex;
+        justify-content: flex-end;
+        margin: 10px 0;
+      }
+
+      .search-dialog {
+        width: min(600px, calc(100% - 32px));
+        max-height: min(80vh, 700px);
+        padding: 20px;
+        border: 1px solid #d3dce6;
+        border-radius: 10px;
+        background: #fff;
+        box-shadow: 0 8px 32px rgb(0 0 0 / 25%);
+      }
+
+      .search-dialog::backdrop {
+        background: rgb(0 0 0 / 45%);
+      }
+
+      .search-dialog-header,
+      .search-dialog-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .search-dialog-header h2 {
         margin: 0;
-        padding: 6px;
+      }
+
+      .search-dialog-close {
+        padding: 4px 10px;
+        border: 0;
+        border-radius: 6px;
+        color: inherit;
+        background: transparent;
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+
+      .search-dialog-close:hover {
+        background: rgb(127 127 127 / 15%);
+      }
+
+      .search-dialog-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin: 12px 0;
+      }
+
+      .search-dialog-grid label {
+        min-width: 0;
+      }
+
+      .search-dialog-actions {
+        justify-content: flex-end;
+      }
+
+      .search-clear {
+        padding: 10px;
+        border: 1px solid #d3dce6;
+        border-radius: 6px;
+        color: inherit;
+        background: transparent;
+        cursor: pointer;
       }
 
       .table th,
@@ -588,6 +657,10 @@
           grid-template-columns: 1fr;
           flex-direction: column;
         }
+
+        .search-dialog-grid {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
@@ -678,6 +751,72 @@
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
 
+      <div class="ticket-tools">
+        <button class="btn" type="button" onclick="openTicketSearch()">Search and filter tickets</button>
+      </div>
+      <dialog class="search-dialog" id="ticket-search-dialog" aria-labelledby="ticket-search-title">
+        <div class="search-dialog-header">
+          <h2 id="ticket-search-title">Search and filter tickets</h2>
+          <button class="search-dialog-close" type="button" aria-label="Close search" onclick="closeTicketSearch()">&#215;</button>
+        </div>
+        <div class="search-dialog-grid">
+          <label for="filter-ticket-number">
+            Ticket number
+            <input id="filter-ticket-number" aria-label="Search by ticket number" placeholder="Search ticket number..." oninput="resetTicketList()">
+          </label>
+          <label for="filter-customer">
+            Customer name
+            <input id="filter-customer" aria-label="Search by customer name" placeholder="Search customer name..." oninput="resetTicketList()">
+          </label>
+          <label for="filter-last-updated">
+            Last updated date
+            <input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()">
+          </label>
+          <label for="filter-status">
+            Status
+            <select id="filter-status" aria-label="Filter by status" onchange="resetTicketList()">
+              <option value="">All statuses</option>
+              <option>Assigned</option>
+              <option>In Progress</option>
+              <option>Pending Customer</option>
+              <option>Pending Vendor</option>
+              <option>Resolved</option>
+              <option>Closed</option>
+            </select>
+          </label>
+          <label for="filter-priority">
+            Priority
+            <select id="filter-priority" aria-label="Filter by priority" onchange="resetTicketList()">
+              <option value="">All priorities</option>
+              <option>High</option>
+              <option>Medium</option>
+              <option>Low</option>
+            </select>
+          </label>
+          <label for="filter-ticket-from">
+            Ticket source
+            <select id="filter-ticket-from" aria-label="Filter by ticket source" onchange="resetTicketList()">
+              <option value="">All sources</option>
+              <option value="AM">AM</option>
+              <option value="PS">PS</option>
+            </select>
+          </label>
+          <label for="sort-tickets">
+            Sort tickets
+            <select id="sort-tickets" aria-label="Sort tickets" onchange="resetTicketList()">
+              <option value="">Manual order</option>
+              <option value="newest">Last updated: newest to oldest</option>
+              <option value="oldest">Last updated: oldest to newest</option>
+              <option value="customer-asc">Customer: A to Z</option>
+              <option value="customer-desc">Customer: Z to A</option>
+            </select>
+          </label>
+        </div>
+        <div class="search-dialog-actions">
+          <button class="search-clear" type="button" onclick="clearTicketSearch()">Clear filters</button>
+          <button class="btn" type="button" onclick="closeTicketSearch()">Done</button>
+        </div>
+      </dialog>
       <div class="table-container">
         <table class="table profile-steven" id="ticket-table">
           <colgroup>
@@ -702,47 +841,6 @@
               <th>Last Updated</th>
               <th>Description</th>
               <th>Actions</th>
-            </tr>
-            <tr class="column-filters">
-              <th></th>
-              <th><input id="filter-ticket-number" aria-label="Filter by ticket number" placeholder="Filter..." oninput="resetTicketList()"></th>
-              <th><input id="filter-customer" aria-label="Filter by customer" placeholder="Filter..." oninput="resetTicketList()"></th>
-              <th>
-                <select id="filter-status" aria-label="Filter by status" onchange="resetTicketList()">
-                  <option value="">All statuses</option>
-                  <option>Assigned</option>
-                  <option>In Progress</option>
-                  <option>Pending Customer</option>
-                  <option>Pending Vendor</option>
-                  <option>Resolved</option>
-                  <option>Closed</option>
-                </select>
-              </th>
-              <th>
-                <select id="filter-priority" aria-label="Filter by priority" onchange="resetTicketList()">
-                  <option value="">All priorities</option>
-                  <option>High</option>
-                  <option>Medium</option>
-                  <option>Low</option>
-                </select>
-              </th>
-              <th>
-                <select id="filter-ticket-from" aria-label="Filter by ticket from" onchange="resetTicketList()">
-                  <option value="">All sources</option>
-                  <option value="AM">AM</option>
-                  <option value="PS">PS</option>
-                </select>
-              </th>
-              <th>
-                <input id="filter-last-updated" type="date" aria-label="Filter by last updated date" onchange="resetTicketList()">
-                <select id="sort-last-updated" aria-label="Sort by last updated" onchange="resetTicketList()">
-                  <option value="">Manual order</option>
-                  <option value="newest">Newest to oldest</option>
-                  <option value="oldest">Oldest to newest</option>
-                </select>
-              </th>
-              <th><input id="filter-description" aria-label="Filter by description" placeholder="Filter..." oninput="resetTicketList()"></th>
-              <th></th>
             </tr>
           </thead>
           <tbody id="list"></tbody>
@@ -1403,6 +1501,32 @@
         resetTicketList();
       }
 
+      function openTicketSearch() {
+        const dialog = document.getElementById("ticket-search-dialog");
+        if (dialog.open) return;
+        dialog.showModal();
+        document.getElementById("filter-ticket-number").focus();
+      }
+
+      function closeTicketSearch() {
+        document.getElementById("ticket-search-dialog").close();
+      }
+
+      function clearTicketSearch() {
+        [
+          "filter-ticket-number",
+          "filter-customer",
+          "filter-last-updated",
+          "filter-status",
+          "filter-priority",
+          "filter-ticket-from",
+          "sort-tickets",
+        ].forEach((id) => {
+          document.getElementById(id).value = "";
+        });
+        resetTicketList();
+      }
+
       function resetTicketList() {
         visibleTicketLimit = ticketPageSize;
         render();
@@ -1446,7 +1570,7 @@
         const filterPriority = document.getElementById("filter-priority").value;
         const filterTicketFrom = document.getElementById("filter-ticket-from").value;
         const filterLastUpdated = document.getElementById("filter-last-updated").value;
-        const sortLastUpdated = document.getElementById("sort-last-updated").value;
+        const sortTickets = document.getElementById("sort-tickets").value;
         const visibleTickets = tickets.filter((ticket) =>
           ticket.ticketNumber.toLowerCase().includes(filterText("filter-ticket-number")) &&
           (ticket.customerName || "").toLowerCase().includes(filterText("filter-customer")) &&
@@ -1454,14 +1578,22 @@
           (!filterPriority || ticket.priority === filterPriority) &&
           (!filterTicketFrom || (ticket.ticketFrom || "").trim().toUpperCase() === filterTicketFrom) &&
           matchesLocalDate(ticket.lastUpdateAt, filterLastUpdated) &&
-          (ticket.shortDescription || "").toLowerCase().includes(filterText("filter-description")) &&
           matchesCategory(ticket)
         );
 
-        if (sortLastUpdated === "newest" || sortLastUpdated === "oldest") {
-          const direction = sortLastUpdated === "newest" ? -1 : 1;
+        if (sortTickets === "newest" || sortTickets === "oldest") {
+          const direction = sortTickets === "newest" ? -1 : 1;
           visibleTickets.sort((left, right) =>
             direction * (Date.parse(left.lastUpdateAt) - Date.parse(right.lastUpdateAt))
+          );
+        } else if (sortTickets === "customer-asc" || sortTickets === "customer-desc") {
+          const direction = sortTickets === "customer-asc" ? 1 : -1;
+          visibleTickets.sort((left, right) =>
+            direction * (left.customerName || "").localeCompare(
+              right.customerName || "",
+              undefined,
+              { sensitivity: "base" }
+            )
           );
         }
 
@@ -1549,7 +1681,7 @@
 
       function render() {
         const visibleTickets = getVisibleTickets();
-        const isDateSorted = document.getElementById("sort-last-updated").value !== "";
+        const isSorted = document.getElementById("sort-tickets").value !== "";
 
         document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
         updateTableWidth();
@@ -1574,7 +1706,7 @@
           ticketList.innerHTML += `
             <tr
               class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
-              draggable="${!isDateSorted}"
+              draggable="${!isSorted}"
               ondragstart="startTicketDrag(event, ${index})"
               ondragover="dragOverTicket(event)"
               ondragleave="event.currentTarget.classList.remove('ticket-row-drop-target')"
@@ -1589,7 +1721,7 @@
                   min="1"
                   max="${visibleTickets.length}"
                   value="${visiblePosition + 1}"
-                  ${isDateSorted ? "disabled" : ""}
+                  ${isSorted ? "disabled" : ""}
                   aria-label="Position for ticket ${ticket.ticketNumber}"
                   title="1 is the top; ${visibleTickets.length} moves to the bottom"
                   onchange="event.stopPropagation(); moveTicketToPosition(${index}, this.value)"

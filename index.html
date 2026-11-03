@@ -951,6 +951,7 @@
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const hourlyReminderInterval = 60 * 60 * 1000;
       const reminderInterval = 24 * 60 * 60 * 1000;
+      const resolvedClosureInterval = 7 * 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
@@ -973,6 +974,7 @@
       let previousFocus = null;
       let draggedTicket = null;
       let pendingTicketDeletion = null;
+      let needsTicketMigrationSave = false;
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
@@ -986,6 +988,15 @@
             ? Number.isNaN(legacyLastUpdateAt) ? Date.now() : legacyLastUpdateAt
             : lastUpdateAt;
           cleanedTicket.lastUpdateAt = new Date(normalizedLastUpdateAt).toISOString();
+          if (cleanedTicket.status === "Resolved") {
+            if (Number.isNaN(Date.parse(cleanedTicket.resolvedAt))) {
+              cleanedTicket.resolvedAt = new Date(normalizedLastUpdateAt).toISOString();
+              needsTicketMigrationSave = true;
+            }
+          } else if (cleanedTicket.resolvedAt) {
+            delete cleanedTicket.resolvedAt;
+            needsTicketMigrationSave = true;
+          }
           if (Number.isNaN(Date.parse(cleanedTicket.nextHourlyReminderAt))) {
             cleanedTicket.nextHourlyReminderAt = new Date(
               normalizedLastUpdateAt + hourlyReminderInterval
@@ -1005,6 +1016,8 @@
           }
           return cleanedTicket;
         });
+
+      if (needsTicketMigrationSave) save();
 
       function stripLegacyReminderFields(ticket) {
         const cleanedTicket = { ...ticket };
@@ -1139,6 +1152,7 @@
               nextHourlyReminderAt: new Date(Date.now() + hourlyReminderInterval).toISOString(),
               notes: [],
             };
+            if (status === "Resolved") ticket.resolvedAt = updatedAtIso;
             if (needsStatusReminder(status)) {
               ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
             }
@@ -1640,6 +1654,7 @@
           nextHourlyReminderAt: new Date(createdAt.getTime() + hourlyReminderInterval).toISOString(),
           notes: [],
         };
+        if (ticket.status === "Resolved") ticket.resolvedAt = createdAt.toISOString();
         if (needsStatusReminder(ticket.status)) {
           ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
         }
@@ -1709,6 +1724,11 @@
         if (tickets[index].status === status) return;
         tickets[index].status = status;
         updateLastUpdate(index);
+        if (status === "Resolved") {
+          tickets[index].resolvedAt = new Date().toISOString();
+        } else {
+          delete tickets[index].resolvedAt;
+        }
         if (needsStatusReminder(status)) {
           tickets[index].nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
         } else {
@@ -1716,6 +1736,33 @@
         }
         save();
         render();
+      }
+
+      function checkResolvedTickets() {
+        const now = Date.now();
+        const closedTickets = [];
+
+        tickets.forEach((ticket, index) => {
+          if (ticket.status !== "Resolved") return;
+          const resolvedAt = Date.parse(ticket.resolvedAt);
+          if (!Number.isFinite(resolvedAt) || resolvedAt + resolvedClosureInterval > now) return;
+
+          ticket.status = "Closed";
+          delete ticket.resolvedAt;
+          delete ticket.nextStatusReminderAt;
+          updateLastUpdate(index);
+          closedTickets.push(ticket);
+        });
+
+        if (closedTickets.length) {
+          save();
+          render();
+          const ticketNumbers = closedTickets.map((ticket) => ticket.ticketNumber).join(", ");
+          pop(
+            `Automatically closed ${closedTickets.length === 1 ? "ticket" : "tickets"}: ${ticketNumbers}`,
+            closedTickets
+          );
+        }
       }
 
       function priorityChange(index, priority) {
@@ -2143,6 +2190,8 @@
 
       checkStatusReminders();
       setInterval(checkStatusReminders, 60 * 1000);
+      checkResolvedTickets();
+      setInterval(checkResolvedTickets, 60 * 1000);
       checkTicketReminders();
       setInterval(() => {
         checkTicketReminders();

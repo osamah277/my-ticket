@@ -978,6 +978,10 @@
       let tickets = JSON.parse(localStorage.getItem(storageKey) || "[]")
         .map((ticket) => {
           const cleanedTicket = stripLegacyReminderFields(ticket);
+          if (!Array.isArray(cleanedTicket.notes)) {
+            cleanedTicket.notes = [];
+            needsTicketMigrationSave = true;
+          }
           if (cleanedTicket.status === "Open") cleanedTicket.status = "Assigned";
           if (!["High", "Medium", "Low"].includes(cleanedTicket.priority)) {
             cleanedTicket.priority = "Medium";
@@ -1701,12 +1705,14 @@
 
       function openTicket(event, index) {
         event.stopPropagation();
+        if (isTicketLocked(tickets[index])) return;
         updateLastUpdate(index);
         save();
         document.getElementById(`last-update-${index}`).textContent = tickets[index].lastUpdate;
       }
 
       function addNote(index) {
+        if (isTicketLocked(tickets[index])) return;
         const noteInput = document.getElementById(`note${index}`);
         const text = noteInput.value.trim();
         if (!text) return;
@@ -1721,18 +1727,24 @@
       }
 
       function statusChange(index, status) {
-        if (tickets[index].status === status) return;
-        tickets[index].status = status;
+        const ticket = tickets[index];
+        if (isTicketLocked(ticket) || ticket.status === status) return;
+        const changedAt = new Date();
+        ticket.status = status;
         updateLastUpdate(index);
+        ticket.notes.push({
+          date: changedAt.toLocaleString(),
+          text: `Status changed to "${status}"`,
+        });
         if (status === "Resolved") {
-          tickets[index].resolvedAt = new Date().toISOString();
+          ticket.resolvedAt = changedAt.toISOString();
         } else {
-          delete tickets[index].resolvedAt;
+          delete ticket.resolvedAt;
         }
         if (needsStatusReminder(status)) {
-          tickets[index].nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
+          ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
         } else {
-          delete tickets[index].nextStatusReminderAt;
+          delete ticket.nextStatusReminderAt;
         }
         save();
         render();
@@ -1748,6 +1760,10 @@
           if (!Number.isFinite(resolvedAt) || resolvedAt + resolvedClosureInterval > now) return;
 
           ticket.status = "Closed";
+          ticket.notes.push({
+            date: new Date(now).toLocaleString(),
+            text: 'Status changed to "Closed" automatically after one week in Resolved',
+          });
           delete ticket.resolvedAt;
           delete ticket.nextStatusReminderAt;
           updateLastUpdate(index);
@@ -1766,6 +1782,7 @@
       }
 
       function priorityChange(index, priority) {
+        if (isTicketLocked(tickets[index])) return;
         if (tickets[index].priority === priority) return;
         if (!["High", "Medium", "Low"].includes(priority)) {
           pop("Choose a valid ticket priority");
@@ -1814,6 +1831,7 @@
 
       function setTicketReminder(index) {
         const ticket = tickets[index];
+        if (ticket && isTicketLocked(ticket)) return;
         if (!ticket || ticket.ticketReminderAt) {
           pop("This ticket already has an active reminder");
           return;
@@ -1836,7 +1854,7 @@
 
       function cancelTicketReminder(index) {
         const ticket = tickets[index];
-        if (!ticket) return;
+        if (!ticket || isTicketLocked(ticket)) return;
         delete ticket.ticketReminderAt;
         save();
         render();
@@ -1929,11 +1947,22 @@
         render();
       }
 
+      function isClosedCategoryStatus(status) {
+        return status === "Closed" || status === "Resolved";
+      }
+
+      function isTicketLocked(ticket) {
+        if (ticket.status === "Closed") return true;
+        if (ticket.status !== "Resolved") return false;
+        const resolvedAt = Date.parse(ticket.resolvedAt);
+        return Number.isFinite(resolvedAt) && resolvedAt + resolvedClosureInterval <= Date.now();
+      }
+
       function matchesCategory(ticket) {
-        if (activeCategory === "Active") return ticket.status !== "Closed";
+        if (activeCategory === "Active") return !isClosedCategoryStatus(ticket.status);
         if (activeCategory === "In Progress") return ticket.status === "In Progress";
         if (activeCategory === "Pending") return ticket.status.includes("Pending");
-        if (activeCategory === "Closed") return ticket.status === "Closed";
+        if (activeCategory === "Closed") return isClosedCategoryStatus(ticket.status);
         return true;
       }
 
@@ -1991,6 +2020,9 @@
       }
 
       function moveTicketToPosition(index, requestedPosition) {
+        const ticket = tickets[index];
+        if (!ticket || isTicketLocked(ticket)) return;
+
         const visibleTickets = getVisibleTickets();
         const currentPosition = visibleTickets.indexOf(tickets[index]);
         const position = Number(requestedPosition);
@@ -2003,7 +2035,6 @@
         const targetPosition = Math.min(position, visibleTickets.length) - 1;
         if (currentPosition < 0 || targetPosition === currentPosition) return;
 
-        const ticket = tickets[index];
         const targetTicket = visibleTickets[targetPosition];
         tickets.splice(index, 1);
         const targetIndex = tickets.indexOf(targetTicket);
@@ -2014,6 +2045,7 @@
       }
 
       function startTicketDrag(event, index) {
+        if (isTicketLocked(tickets[index])) return;
         draggedTicket = tickets[index];
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", draggedTicket.ticketNumber);
@@ -2036,6 +2068,10 @@
       function dropTicket(event, targetIndex) {
         event.preventDefault();
         const targetTicket = tickets[targetIndex];
+        if (isTicketLocked(targetTicket)) {
+          endTicketDrag();
+          return;
+        }
         if (!draggedTicket || draggedTicket === targetTicket) {
           endTicketDrag();
           return;
@@ -2082,10 +2118,11 @@
         ticketsToRender.forEach((ticket, visiblePosition) => {
           const index = tickets.indexOf(ticket);
           const ticketLink = getTicketLink(ticket);
+          const isLocked = isTicketLocked(ticket);
           ticketList.innerHTML += `
             <tr
               class="ticket-row priority-row-${ticket.priority.toLowerCase()}"
-              draggable="${!isSorted}"
+              draggable="${!isSorted && !isLocked}"
               ondragstart="startTicketDrag(event, ${index})"
               ondragover="dragOverTicket(event)"
               ondragleave="event.currentTarget.classList.remove('ticket-row-drop-target')"
@@ -2100,7 +2137,7 @@
                   min="1"
                   max="${visibleTickets.length}"
                   value="${visiblePosition + 1}"
-                  ${isSorted ? "disabled" : ""}
+                  ${isSorted || isLocked ? "disabled" : ""}
                   aria-label="Position for ticket ${escapeAttribute(ticket.ticketNumber)}"
                   title="1 is the top; ${visibleTickets.length} moves to the bottom"
                   onchange="event.stopPropagation(); moveTicketToPosition(${index}, this.value)"
@@ -2120,7 +2157,7 @@
             <tr id="detail-row-${index}" hidden>
               <td colspan="${activeProfile === "steven" ? 7 : 8}">
                 <div class="detail" id="d${index}">
-                  <select onchange="statusChange(${index}, this.value)">
+                  <select onchange="statusChange(${index}, this.value)" ${isLocked ? "disabled" : ""}>
                     <option selected>${ticket.status}</option>
                     <option>Assigned</option>
                     <option>In Progress</option>
@@ -2130,13 +2167,17 @@
                     <option>Closed</option>
                   </select>
                   <label for="ticket-priority-${index}">Priority</label>
-                  <select id="ticket-priority-${index}" onchange="priorityChange(${index}, this.value)">
+                  <select id="ticket-priority-${index}" onchange="priorityChange(${index}, this.value)" ${isLocked ? "disabled" : ""}>
                     <option value="High" ${ticket.priority === "High" ? "selected" : ""}>High (Red)</option>
                     <option value="Medium" ${ticket.priority === "Medium" ? "selected" : ""}>Medium (Yellow)</option>
                     <option value="Low" ${ticket.priority === "Low" ? "selected" : ""}>Low (Green)</option>
                   </select>
-                  <textarea id="note${index}" placeholder="Add note"></textarea>
-                  <button class="btn" onclick="event.stopPropagation(); addNote(${index})">
+                  <textarea
+                    id="note${index}"
+                    placeholder="${isLocked ? "Comments cannot be added to locked tickets" : "Add note"}"
+                    ${isLocked ? "disabled" : ""}
+                  ></textarea>
+                  <button class="btn" onclick="event.stopPropagation(); addNote(${index})" ${isLocked ? "disabled" : ""}>
                     Save Note
                   </button>
                   ${ticket.notes.map((note) => `
@@ -2149,7 +2190,7 @@
                           <p data-reminder-at="${ticket.ticketReminderAt}">
                             Reminder in ${formatCountdown(Date.parse(ticket.ticketReminderAt) - Date.now())}
                           </p>
-                          <button class="delete-btn" onclick="event.stopPropagation(); cancelTicketReminder(${index})">
+                          <button class="delete-btn" onclick="event.stopPropagation(); cancelTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
                             Cancel Reminder
                           </button>
                         `
@@ -2159,8 +2200,9 @@
                             id="reminder${index}"
                             type="datetime-local"
                             min="${toLocalDateTimeValue(new Date())}"
+                            ${isLocked ? "disabled" : ""}
                           >
-                          <button class="btn" onclick="event.stopPropagation(); setTicketReminder(${index})">
+                          <button class="btn" onclick="event.stopPropagation(); setTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
                             Set Reminder
                           </button>
                         `
@@ -2174,13 +2216,13 @@
 
         document.getElementById("t").innerText = tickets.length;
         document.getElementById("o").innerText =
-          tickets.filter((ticket) => ticket.status !== "Closed").length;
+          tickets.filter((ticket) => !isClosedCategoryStatus(ticket.status)).length;
         document.getElementById("i").innerText =
           tickets.filter((ticket) => ticket.status === "In Progress").length;
         document.getElementById("p").innerText =
           tickets.filter((ticket) => ticket.status.includes("Pending")).length;
         document.getElementById("c").innerText =
-          tickets.filter((ticket) => ticket.status === "Closed").length;
+          tickets.filter((ticket) => isClosedCategoryStatus(ticket.status)).length;
       }
 
       function toLocalDateTimeValue(date) {

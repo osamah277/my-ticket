@@ -1567,6 +1567,7 @@
         if (now.getHours() < 7 || now.getHours() > 15) return;
 
         const dueTickets = [];
+        let reminderScheduleChanged = false;
         tickets.forEach((ticket) => {
           if (ticket.status === "Closed") return;
 
@@ -1576,6 +1577,15 @@
           }
           if (Number.isNaN(nextReminder) || nextReminder > now.getTime()) return;
 
+          if (ticket.ticketReminderAt) {
+            do {
+              nextReminder += hourlyReminderInterval;
+            } while (nextReminder <= now.getTime());
+            ticket.nextHourlyReminderAt = new Date(nextReminder).toISOString();
+            reminderScheduleChanged = true;
+            return;
+          }
+
           dueTickets.push(ticket);
           do {
             nextReminder += hourlyReminderInterval;
@@ -1583,8 +1593,8 @@
           ticket.nextHourlyReminderAt = new Date(nextReminder).toISOString();
         });
 
+        if (reminderScheduleChanged || dueTickets.length) save();
         if (dueTickets.length) {
-          save();
           const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
           pop(`Hourly reminder: check tickets not updated in the last hour ${ticketNumbers}`, dueTickets);
         }

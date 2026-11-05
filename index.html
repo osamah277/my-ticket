@@ -663,6 +663,17 @@
         box-shadow: 0 8px 32px rgb(0 0 0 / 25%);
       }
 
+      .notif-dialog.ticket-reminder {
+        border: 3px solid #7c3aed;
+        background: #f3e8ff;
+      }
+
+      .dark-mode .notif-dialog.ticket-reminder {
+        color: #f5f3ff;
+        border-color: #a78bfa;
+        background: #302542;
+      }
+
       .notif-dialog h2 {
         margin: 0 0 10px;
       }
@@ -1404,8 +1415,8 @@
         render();
       }
 
-      function pop(message, linkedTickets = []) {
-        const notification = { message, linkedTickets };
+      function pop(message, linkedTickets = [], type = "default") {
+        const notification = { message, linkedTickets, type };
         if (document.getElementById("n").style.display === "flex") {
           notificationQueue.push(notification);
           return;
@@ -1416,6 +1427,10 @@
       }
 
       function showNotification(notification) {
+        document.querySelector(".notif-dialog").classList.toggle(
+          "ticket-reminder",
+          notification.type === "ticket-reminder"
+        );
         const messageElement = document.getElementById("notification-message");
         messageElement.replaceChildren();
         const ticketsByNumber = new Map(
@@ -1849,7 +1864,7 @@
         render();
         document.getElementById(`detail-row-${index}`).hidden = false;
         document.getElementById(`d${index}`).style.display = "block";
-        pop(`Reminder set for ticket ${ticket.ticketNumber}`, [ticket]);
+        pop(`Reminder set for ticket ${ticket.ticketNumber}`, [ticket], "ticket-reminder");
       }
 
       function cancelTicketReminder(index) {
@@ -1889,7 +1904,7 @@
           save();
           render();
           const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
-          pop(`Reminder: ${ticketNumbers}`, dueTickets);
+          pop(`Reminder: ${ticketNumbers}`, dueTickets, "ticket-reminder");
         }
       }
 

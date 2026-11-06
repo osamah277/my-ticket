@@ -1736,14 +1736,28 @@
         document.getElementById(`last-update-${index}`).textContent = tickets[index].lastUpdate;
       }
 
+      function getNoteTimestamp(note) {
+        if (typeof note?.timestamp === "number" && Number.isFinite(note.timestamp)) {
+          return note.timestamp;
+        }
+        const parsedDate = Date.parse(note?.date || "");
+        return Number.isFinite(parsedDate) ? parsedDate : 0;
+      }
+
+      function sortNotesNewestFirst(notes) {
+        return [...notes].sort((left, right) => getNoteTimestamp(right) - getNoteTimestamp(left));
+      }
+
       function addNote(index) {
         if (isTicketLocked(tickets[index])) return;
         const noteInput = document.getElementById(`note${index}`);
         const text = noteInput.value.trim();
         if (!text) return;
 
+        const now = Date.now();
         tickets[index].notes.push({
-          date: new Date().toLocaleString(),
+          date: new Date(now).toLocaleString(),
+          timestamp: now,
           text,
         });
         updateLastUpdate(index);
@@ -1759,6 +1773,7 @@
         updateLastUpdate(index);
         ticket.notes.push({
           date: changedAt.toLocaleString(),
+          timestamp: changedAt.getTime(),
           text: `Status changed to "${status}"`,
         });
         if (status === "Resolved") {
@@ -1787,6 +1802,7 @@
           ticket.status = "Closed";
           ticket.notes.push({
             date: new Date(now).toLocaleString(),
+            timestamp: now,
             text: 'Status changed to "Closed" automatically after one week in Resolved',
           });
           delete ticket.resolvedAt;
@@ -2205,7 +2221,7 @@
                   <button class="btn" onclick="event.stopPropagation(); addNote(${index})" ${isLocked ? "disabled" : ""}>
                     Save Note
                   </button>
-                  ${[...ticket.notes].reverse().map((note) => `
+                  ${sortNotesNewestFirst(ticket.notes).map((note) => `
                     <div class="note">${note.date}<br>${note.text}</div>
                   `).join("")}
                   <div class="reminder">

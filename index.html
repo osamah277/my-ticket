@@ -2205,7 +2205,7 @@
                   <button class="btn" onclick="event.stopPropagation(); addNote(${index})" ${isLocked ? "disabled" : ""}>
                     Save Note
                   </button>
-                  ${ticket.notes.map((note) => `
+                  ${[...ticket.notes].reverse().map((note) => `
                     <div class="note">${note.date}<br>${note.text}</div>
                   `).join("")}
                   <div class="reminder">

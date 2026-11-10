@@ -395,6 +395,15 @@
         background: #4a90e2;
       }
 
+      .set-reminder-btn {
+        background: #16804a;
+        cursor: pointer;
+      }
+
+      .set-reminder-btn:hover:not(:disabled) {
+        background: #11663a;
+      }
+
       .delete-btn {
         padding: 6px 10px;
         border: none;
@@ -2243,7 +2252,7 @@
                             min="${toLocalDateTimeValue(new Date())}"
                             ${isLocked ? "disabled" : ""}
                           >
-                          <button class="btn" onclick="event.stopPropagation(); setTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
+                          <button class="btn set-reminder-btn" onclick="event.stopPropagation(); setTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
                             Set Reminder
                           </button>
                         `

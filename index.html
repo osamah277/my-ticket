@@ -962,7 +962,7 @@
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const hourlyReminderInterval = 60 * 60 * 1000;
       const reminderInterval = 24 * 60 * 60 * 1000;
-      const resolvedClosureInterval = 7 * 24 * 60 * 60 * 1000;
+      const resolvedClosureInterval = 5 * 24 * 60 * 60 * 1000;
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
@@ -1803,7 +1803,7 @@
           ticket.notes.push({
             date: new Date(now).toLocaleString(),
             timestamp: now,
-            text: 'Status changed to "Closed" automatically after one week in Resolved',
+            text: 'Status changed to "Closed" automatically after five days in Resolved',
           });
           delete ticket.resolvedAt;
           delete ticket.nextStatusReminderAt;

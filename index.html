@@ -621,12 +621,12 @@
       }
 
       .calendar-grid {
-        min-width: 600px;
+        min-width: 664px;
       }
 
       .calendar-week {
         display: grid;
-        grid-template-columns: repeat(5, minmax(120px, 1fr));
+        grid-template-columns: 64px repeat(5, minmax(120px, 1fr));
         border-left: 1px solid #d3dce6;
       }
 
@@ -659,18 +659,29 @@
         );
       }
 
+      .calendar-time-rail {
+        vertical-align: top;
+      }
+
+      .calendar-time-scale {
+        position: relative;
+        height: 420px;
+        color: #788493;
+        font-size: 0.7rem;
+        text-align: right;
+      }
+
+      .calendar-time-scale span {
+        position: absolute;
+        top: calc(var(--hour) * 60px - 8px);
+        right: 4px;
+        white-space: nowrap;
+      }
+
       .calendar-event-closed-list {
         display: grid;
         gap: 4px;
         margin-top: 6px;
-      }
-
-      .calendar-time-labels {
-        display: flex;
-        justify-content: space-between;
-        padding: 2px 4px;
-        color: #788493;
-        font-size: 0.7rem;
       }
 
       .calendar-day-today {
@@ -773,7 +784,7 @@
         );
       }
 
-      .dark-mode .calendar-time-labels {
+      .dark-mode .calendar-time-scale {
         color: #aab4c2;
       }
 
@@ -996,7 +1007,7 @@
         }
 
         .calendar-week {
-          grid-template-columns: repeat(5, minmax(110px, 1fr));
+          grid-template-columns: 64px repeat(5, minmax(110px, 1fr));
         }
 
         .row,
@@ -2451,6 +2462,9 @@
         const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
+        const timeScale = Array.from({ length: 8 }, (_, hour) => `
+          <span style="--hour: ${hour}">${hour === 0 ? "8 AM" : hour < 4 ? `${8 + hour} AM` : hour === 4 ? "12 PM" : `${hour - 4} PM`}</span>
+        `).join("");
         const dayCells = Array.from({ length: 5 }, (_, dayOffset) => {
           const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
           const dayKey = localDateKey(day);
@@ -2466,15 +2480,20 @@
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
               <div class="calendar-day-number">${day.getDate()}</div>
-              <div class="calendar-time-labels"><span>8 AM</span><span>9 AM</span><span>10 AM</span><span>11 AM</span><span>12 PM</span><span>1 PM</span><span>2 PM</span><span>3 PM</span></div>
               <div class="calendar-day-events">${scheduledEvents}</div>
               ${closedEvents ? `<div class="calendar-event-closed-list">${closedEvents}</div>` : ""}
             </div>
           `;
         }).join("");
         const grid = `<div class="calendar-grid-container"><div class="calendar-grid" role="grid">
-          <div class="calendar-week" role="row">${weekdays}</div>
-          <div class="calendar-week" role="row">${dayCells}</div>
+          <div class="calendar-week" role="row"><div class="calendar-weekday" role="columnheader" aria-label="Time"></div>${weekdays}</div>
+          <div class="calendar-week" role="row">
+            <div class="calendar-day calendar-time-rail" role="presentation">
+              <div class="calendar-day-number" aria-hidden="true">&nbsp;</div>
+              <div class="calendar-time-scale">${timeScale}</div>
+            </div>
+            ${dayCells}
+          </div>
         </div></div>`;
         document.getElementById("calendar-period-label").textContent = weekLabel;
         document.getElementById("calendar-view-content").innerHTML = grid;

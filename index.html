@@ -1272,7 +1272,7 @@
         <div class="calendar-header">
           <h2 id="calendar-title">Reminder Calendar</h2>
         </div>
-        <p>Weekdays only. Schedule reminders from 8:00 AM to 3:00 PM; each task must finish by 3:00 PM.</p>
+        <p>Weekdays only. Reminder start times are 7:35 AM-3:29 PM.</p>
         <div class="calendar-toolbar">
           <h3 id="calendar-period-label"></h3>
           <div class="calendar-navigation">
@@ -1298,7 +1298,7 @@
         <input id="calendar-reminder-time" type="datetime-local" step="60">
         <label for="calendar-reminder-duration">Task duration (minutes)</label>
         <input id="calendar-reminder-duration" type="number" min="1" step="1" value="30">
-        <p>Schedule Monday-Friday, 8:00 AM-3:00 PM. The task must finish by 3:00 PM.</p>
+        <p>Schedule Monday-Friday, with a start time from 7:35 AM through 3:29 PM.</p>
         <p class="delete-confirm-error" id="calendar-reminder-error" role="alert"></p>
         <div class="search-dialog-actions">
           <button class="delete-btn" id="calendar-reminder-cancel" type="button" onclick="cancelReminderFromEditor()" hidden>
@@ -2226,8 +2226,8 @@
         if (!Number.isFinite(reminderEnd) || Number.isNaN(new Date(reminderEnd).getTime())) {
           return "Task duration is too long for the selected reminder time";
         }
-        if (!isWithinSchedulingHours(reminderTime, durationMinutes)) {
-          return "Schedule Monday-Friday between 8:00 AM and 3:00 PM; the task must finish by 3:00 PM";
+        if (!isWithinSchedulingHours(reminderTime)) {
+          return "Schedule Monday-Friday with a start time from 7:35 AM through 3:29 PM";
         }
 
         const conflictingTicket = tickets.find((otherTicket, otherIndex) => {
@@ -2249,17 +2249,13 @@
         return "";
       }
 
-      function isWithinSchedulingHours(reminderTime, durationMinutes) {
+      function isWithinSchedulingHours(reminderTime) {
         const start = new Date(reminderTime);
-        const end = new Date(reminderTime + durationMinutes * 60 * 1000);
-        if (start.getDay() === 0 || start.getDay() === 6 || localDateKey(start) !== localDateKey(end)) {
-          return false;
-        }
-        const opening = new Date(start);
-        opening.setHours(8, 0, 0, 0);
-        const closing = new Date(start);
-        closing.setHours(15, 0, 0, 0);
-        return start >= opening && end <= closing;
+        const minuteOfDay = start.getHours() * 60 + start.getMinutes();
+        return start.getDay() !== 0 &&
+          start.getDay() !== 6 &&
+          minuteOfDay >= 7 * 60 + 35 &&
+          minuteOfDay < 15 * 60 + 30;
       }
 
       function cancelTicketReminder(index) {
@@ -2444,9 +2440,7 @@
         const date = new Date(`${dateKey}T00:00:00`);
         const bounds = target.getBoundingClientRect();
         const pointerOffset = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
-        const minuteOffset = Math.round(
-          pointerOffset / (calendarPixelsPerMinute * 30)
-        ) * 30;
+        const minuteOffset = Math.round(pointerOffset / calendarPixelsPerMinute);
         const reminderMinute = calendarDisplayStartMinute + minuteOffset;
         date.setHours(Math.floor(reminderMinute / 60), reminderMinute % 60, 0, 0);
 
@@ -2999,7 +2993,7 @@
                             min="${toLocalDateTimeValue(new Date())}"
                             ${isLocked ? "disabled" : ""}
                           >
-                          <p>Schedule Monday-Friday between 8:00 AM and 3:00 PM; the task must finish by 3:00 PM.</p>
+                          <p>Schedule Monday-Friday, with a start time from 7:35 AM through 3:29 PM.</p>
                           <label for="reminder-duration${index}">Task duration (minutes)</label>
                           <input
                             id="reminder-duration${index}"

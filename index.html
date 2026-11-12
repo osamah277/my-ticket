@@ -649,7 +649,7 @@
 
       .calendar-day-events {
         position: relative;
-        height: 960px;
+        height: 900px;
         background-image: repeating-linear-gradient(
           to bottom,
           transparent 0,
@@ -665,7 +665,7 @@
 
       .calendar-time-scale {
         position: relative;
-        height: 960px;
+        height: 900px;
         color: #788493;
         font-size: 0.7rem;
         text-align: right;
@@ -1309,8 +1309,8 @@
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const resolvedClosureInterval = 5 * 24 * 60 * 60 * 1000;
       const defaultReminderDurationMinutes = 30;
-      const calendarDisplayStartHour = 7;
-      const calendarDisplayEndHour = 15;
+      const calendarDisplayStartMinute = 7 * 60 + 30;
+      const calendarDisplayEndMinute = 15 * 60;
       const calendarPixelsPerMinute = 2;
       const hypredReminderCompletionStorageKey = "ticket_dashboard_hypred_completed_date";
       const ticketPageSize = 20;
@@ -2400,7 +2400,7 @@
 
       function layoutCalendarEvents(events) {
         const intervals = events.map((event) => {
-          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - calendarDisplayStartHour * 60;
+          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - calendarDisplayStartMinute;
           const durationMinutes = event.type === "closed"
             ? 1
             : event.type === "special"
@@ -2482,9 +2482,9 @@
         const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
-        const halfHourSlots = (calendarDisplayEndHour - calendarDisplayStartHour) * 2;
+        const halfHourSlots = (calendarDisplayEndMinute - calendarDisplayStartMinute) / 30;
         const timeScale = Array.from({ length: halfHourSlots + 1 }, (_, halfHour) => {
-          const totalMinutes = calendarDisplayStartHour * 60 + halfHour * 30;
+          const totalMinutes = calendarDisplayStartMinute + halfHour * 30;
           const hour = Math.floor(totalMinutes / 60);
           const minute = totalMinutes % 60;
           const label = `${hour % 12 || 12}${minute ? ":30" : ""} ${hour < 12 ? "AM" : "PM"}`;
@@ -2496,17 +2496,11 @@
           const dayEvents = eventsByDate.get(dayKey) || [];
           const closedOutsideHours = dayEvents
             .filter((event) => event.type === "closed")
-            .filter((event) =>
-              event.date.getHours() < calendarDisplayStartHour ||
-              event.date.getHours() >= calendarDisplayEndHour
-            )
+            .filter((event) => !isWithinCalendarDisplayHours(event.date))
             .map(renderCalendarEvent)
             .join("");
           const timedEvents = dayEvents.filter((event) =>
-            event.type !== "closed" || (
-              event.date.getHours() >= calendarDisplayStartHour &&
-              event.date.getHours() < calendarDisplayEndHour
-            )
+            event.type !== "closed" || isWithinCalendarDisplayHours(event.date)
           );
           const scheduledEvents = layoutCalendarEvents(timedEvents).map(renderCalendarEvent).join("");
           const dayClass = `calendar-day${dayKey === localDateKey(new Date()) ? " calendar-day-today" : ""}`;
@@ -2539,6 +2533,11 @@
           String(date.getMonth() + 1).padStart(2, "0"),
           String(date.getDate()).padStart(2, "0"),
         ].join("-");
+      }
+
+      function isWithinCalendarDisplayHours(date) {
+        const minuteOfDay = date.getHours() * 60 + date.getMinutes();
+        return minuteOfDay >= calendarDisplayStartMinute && minuteOfDay < calendarDisplayEndMinute;
       }
 
       function renderUnscheduledTickets() {

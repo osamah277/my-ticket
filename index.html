@@ -559,6 +559,103 @@
         margin: 10px 0;
       }
 
+      .reminder-calendar {
+        margin: 16px 0;
+        padding: 16px;
+      }
+
+      .calendar-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+      }
+
+      .calendar-header h2 {
+        margin: 0;
+      }
+
+      .calendar-navigation {
+        display: flex;
+        gap: 8px;
+      }
+
+      .calendar-grid-container {
+        overflow-x: auto;
+      }
+
+      .calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(90px, 1fr));
+        min-width: 630px;
+        border-top: 1px solid #d3dce6;
+        border-left: 1px solid #d3dce6;
+      }
+
+      .calendar-weekday,
+      .calendar-day {
+        min-width: 0;
+        padding: 8px;
+        border-right: 1px solid #d3dce6;
+        border-bottom: 1px solid #d3dce6;
+      }
+
+      .calendar-weekday {
+        font-weight: 600;
+        text-align: center;
+      }
+
+      .calendar-day {
+        min-height: 110px;
+      }
+
+      .calendar-day-other-month {
+        color: #788493;
+        background: #f5f7fa;
+      }
+
+      .calendar-day-today {
+        box-shadow: inset 0 0 0 2px #4a90e2;
+      }
+
+      .calendar-day-number {
+        margin-bottom: 6px;
+        font-weight: 600;
+      }
+
+      .calendar-event {
+        margin: 4px 0;
+        padding: 4px;
+        border-radius: 4px;
+        color: #174b2d;
+        background: #d9f3df;
+        overflow-wrap: anywhere;
+        font-size: 0.8rem;
+      }
+
+      .dark-mode .calendar-grid {
+        border-color: #3a4351;
+      }
+
+      .dark-mode .calendar-weekday,
+      .dark-mode .calendar-day {
+        border-color: #3a4351;
+      }
+
+      .dark-mode .calendar-day-other-month {
+        background: #1c222c;
+      }
+
+      .dark-mode .calendar-event {
+        color: #e5e7eb;
+        background: #24543a;
+      }
+
+      .reminder-duration {
+        max-width: 180px;
+      }
+
       .search-dialog {
         width: min(600px, calc(100% - 32px));
         max-height: min(80vh, 700px);
@@ -851,6 +948,21 @@
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
 
+      <section class="card reminder-calendar" aria-labelledby="calendar-title">
+        <div class="calendar-header">
+          <h2 id="calendar-title">Reminder Calendar</h2>
+          <div class="calendar-navigation">
+            <button class="search-clear" type="button" onclick="changeCalendarMonth(-1)" aria-label="Previous month">Previous</button>
+            <button class="search-clear" type="button" onclick="goToCurrentMonth()">Today</button>
+            <button class="search-clear" type="button" onclick="changeCalendarMonth(1)" aria-label="Next month">Next</button>
+          </div>
+        </div>
+        <h3 id="calendar-month-label"></h3>
+        <div class="calendar-grid-container">
+          <div class="calendar-grid" id="calendar-grid" role="grid" aria-labelledby="calendar-title"></div>
+        </div>
+      </section>
+
       <div class="ticket-tools">
         <input
           id="csv-file"
@@ -969,9 +1081,8 @@
       const columnWidthsStorageKey = "ticket_dashboard_column_widths";
       const ticketDeletionPassword = "240926";
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
-      const hourlyReminderInterval = 60 * 60 * 1000;
-      const reminderInterval = 24 * 60 * 60 * 1000;
       const resolvedClosureInterval = 5 * 24 * 60 * 60 * 1000;
+      const defaultReminderDurationMinutes = 30;
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
@@ -992,6 +1103,7 @@
       };
       let notificationQueue = [];
       let previousFocus = null;
+      let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
       let draggedTicket = null;
       let pendingTicketDeletion = null;
       let needsTicketMigrationSave = false;
@@ -1021,22 +1133,24 @@
             delete cleanedTicket.resolvedAt;
             needsTicketMigrationSave = true;
           }
-          if (Number.isNaN(Date.parse(cleanedTicket.nextHourlyReminderAt))) {
-            cleanedTicket.nextHourlyReminderAt = new Date(
-              normalizedLastUpdateAt + hourlyReminderInterval
-            ).toISOString();
-          }
-          if (
-            needsStatusReminder(cleanedTicket.status) &&
-            Number.isNaN(Date.parse(cleanedTicket.nextStatusReminderAt))
-          ) {
-            cleanedTicket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
-          }
           if (
             cleanedTicket.ticketReminderAt &&
             Number.isNaN(Date.parse(cleanedTicket.ticketReminderAt))
           ) {
             delete cleanedTicket.ticketReminderAt;
+            needsTicketMigrationSave = true;
+          }
+          if (cleanedTicket.ticketReminderAt) {
+            if (
+              !Number.isInteger(cleanedTicket.ticketReminderDurationMinutes) ||
+              cleanedTicket.ticketReminderDurationMinutes < 1 ||
+              cleanedTicket.ticketReminderDurationMinutes > 1440
+            ) {
+              cleanedTicket.ticketReminderDurationMinutes = defaultReminderDurationMinutes;
+              needsTicketMigrationSave = true;
+            }
+          } else {
+            delete cleanedTicket.ticketReminderDurationMinutes;
           }
           return cleanedTicket;
         });
@@ -1048,6 +1162,12 @@
         delete cleanedTicket.reminderDate;
         delete cleanedTicket.reminderNote;
         delete cleanedTicket.reminderDone;
+        for (const field of ["nextHourlyReminderAt", "nextStatusReminderAt"]) {
+          if (field in cleanedTicket) {
+            delete cleanedTicket[field];
+            needsTicketMigrationSave = true;
+          }
+        }
         return cleanedTicket;
       }
 
@@ -1173,13 +1293,9 @@
               createdAt: updatedAtIso,
               lastUpdateAt: updatedAtIso,
               lastUpdate: formatLastUpdate(updatedAt),
-              nextHourlyReminderAt: new Date(Date.now() + hourlyReminderInterval).toISOString(),
               notes: [],
             };
             if (status === "Resolved") ticket.resolvedAt = updatedAtIso;
-            if (needsStatusReminder(status)) {
-              ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
-            }
             tickets.push(ticket);
             knownNumbers.add(ticketNumber);
             importedCount += 1;
@@ -1381,10 +1497,6 @@
 
       save();
 
-      function needsStatusReminder(status) {
-        return status === "Assigned" || status === "In Progress";
-      }
-
       function toggleSettings() {
         const panel = document.getElementById("settings-panel");
         const isOpen = panel.hidden;
@@ -1571,44 +1683,6 @@
         pop(`Ticket ${ticketNumber} deleted.`);
       }
 
-      function checkHourlyReminder() {
-        const now = new Date();
-        if (now.getHours() < 7 || now.getHours() > 15) return;
-
-        const dueTickets = [];
-        let reminderScheduleChanged = false;
-        tickets.forEach((ticket) => {
-          if (ticket.status === "Closed") return;
-
-          let nextReminder = Date.parse(ticket.nextHourlyReminderAt);
-          if (Number.isNaN(nextReminder)) {
-            nextReminder = Date.parse(ticket.lastUpdateAt) + hourlyReminderInterval;
-          }
-          if (Number.isNaN(nextReminder) || nextReminder > now.getTime()) return;
-
-          if (ticket.ticketReminderAt) {
-            do {
-              nextReminder += hourlyReminderInterval;
-            } while (nextReminder <= now.getTime());
-            ticket.nextHourlyReminderAt = new Date(nextReminder).toISOString();
-            reminderScheduleChanged = true;
-            return;
-          }
-
-          dueTickets.push(ticket);
-          do {
-            nextReminder += hourlyReminderInterval;
-          } while (nextReminder <= now.getTime());
-          ticket.nextHourlyReminderAt = new Date(nextReminder).toISOString();
-        });
-
-        if (reminderScheduleChanged || dueTickets.length) save();
-        if (dueTickets.length) {
-          const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
-          pop(`Hourly reminder: check tickets not updated in the last hour ${ticketNumbers}`, dueTickets);
-        }
-      }
-
       function nextId() {
         let id = tickets.length + 1;
         let ticketNumber = `INC${String(id).padStart(6, "0")}`;
@@ -1689,13 +1763,9 @@
           createdAt: createdAt.toISOString(),
           lastUpdateAt: createdAt.toISOString(),
           lastUpdate: formatLastUpdate(createdAt),
-          nextHourlyReminderAt: new Date(createdAt.getTime() + hourlyReminderInterval).toISOString(),
           notes: [],
         };
         if (ticket.status === "Resolved") ticket.resolvedAt = createdAt.toISOString();
-        if (needsStatusReminder(ticket.status)) {
-          ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
-        }
 
         tickets.push(ticket);
         save();
@@ -1722,8 +1792,6 @@
         const updatedAt = Number.isFinite(previous) ? Math.max(now, previous + 1000) : now;
         tickets[index].lastUpdateAt = new Date(updatedAt).toISOString();
         tickets[index].lastUpdate = formatLastUpdate(new Date(updatedAt));
-        tickets[index].nextHourlyReminderAt =
-          new Date(updatedAt + hourlyReminderInterval).toISOString();
       }
 
       function formatLastUpdate(date) {
@@ -1790,11 +1858,6 @@
         } else {
           delete ticket.resolvedAt;
         }
-        if (needsStatusReminder(status)) {
-          ticket.nextStatusReminderAt = new Date(Date.now() + reminderInterval).toISOString();
-        } else {
-          delete ticket.nextStatusReminderAt;
-        }
         save();
         render();
       }
@@ -1815,7 +1878,6 @@
             text: 'Status changed to "Closed" automatically after five days in Resolved',
           });
           delete ticket.resolvedAt;
-          delete ticket.nextStatusReminderAt;
           updateLastUpdate(index);
           closedTickets.push(ticket);
         });
@@ -1850,35 +1912,6 @@
         return `priority-${priority.toLowerCase()}`;
       }
 
-      function checkStatusReminders() {
-        const now = Date.now();
-        const dueTickets = [];
-
-        tickets.forEach((ticket) => {
-          if (!needsStatusReminder(ticket.status)) return;
-
-          let nextReminder = Date.parse(ticket.nextStatusReminderAt);
-          if (Number.isNaN(nextReminder)) {
-            nextReminder = now + reminderInterval;
-          } else if (nextReminder <= now) {
-            dueTickets.push(ticket);
-            do {
-              nextReminder += reminderInterval;
-            } while (nextReminder <= now);
-          } else {
-            return;
-          }
-
-          ticket.nextStatusReminderAt = new Date(nextReminder).toISOString();
-        });
-
-        if (dueTickets.length) {
-          save();
-          const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
-          pop(`Reminder: ${ticketNumbers} ${dueTickets.length === 1 ? "is" : "are"} still Assigned or In Progress`, dueTickets);
-        }
-      }
-
       function setTicketReminder(index) {
         const ticket = tickets[index];
         if (ticket && isTicketLocked(ticket)) return;
@@ -1894,7 +1927,30 @@
           return;
         }
 
+        const durationInput = document.getElementById(`reminder-duration${index}`);
+        const durationMinutes = Number(durationInput.value);
+        if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) {
+          pop("Task duration must be between 1 and 1440 minutes");
+          return;
+        }
+
+        const reminderEnd = reminderTime + durationMinutes * 60 * 1000;
+        const conflictingTicket = tickets.find((otherTicket, otherIndex) => {
+          if (otherIndex === index || !otherTicket.ticketReminderAt) return false;
+          const otherStart = Date.parse(otherTicket.ticketReminderAt);
+          const otherDuration = Number.isInteger(otherTicket.ticketReminderDurationMinutes)
+            ? otherTicket.ticketReminderDurationMinutes
+            : defaultReminderDurationMinutes;
+          const otherEnd = otherStart + otherDuration * 60 * 1000;
+          return reminderTime < otherEnd && reminderEnd > otherStart;
+        });
+        if (conflictingTicket) {
+          pop(`This time overlaps the reminder for ticket ${conflictingTicket.ticketNumber}`);
+          return;
+        }
+
         ticket.ticketReminderAt = new Date(reminderTime).toISOString();
+        ticket.ticketReminderDurationMinutes = durationMinutes;
         save();
         render();
         document.getElementById(`detail-row-${index}`).hidden = false;
@@ -1906,6 +1962,7 @@
         const ticket = tickets[index];
         if (!ticket || isTicketLocked(ticket)) return;
         delete ticket.ticketReminderAt;
+        delete ticket.ticketReminderDurationMinutes;
         save();
         render();
       }
@@ -1933,6 +1990,7 @@
           if (!ticket.ticketReminderAt || Date.parse(ticket.ticketReminderAt) > now) return;
           dueTickets.push(ticket);
           delete ticket.ticketReminderAt;
+          delete ticket.ticketReminderDurationMinutes;
         });
 
         if (dueTickets.length) {
@@ -1946,6 +2004,77 @@
       function setCategoryFilter(category) {
         activeCategory = category;
         resetTicketList();
+      }
+
+      function changeCalendarMonth(offset) {
+        calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + offset, 1);
+        renderCalendar();
+      }
+
+      function goToCurrentMonth() {
+        const now = new Date();
+        calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        renderCalendar();
+      }
+
+      function renderCalendar() {
+        const year = calendarMonth.getFullYear();
+        const month = calendarMonth.getMonth();
+        const monthStart = new Date(year, month, 1);
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const gridStart = new Date(year, month, 1 - monthStart.getDay());
+        const gridDayCount = Math.ceil((monthStart.getDay() + daysInMonth) / 7) * 7;
+        const todayKey = localDateKey(new Date());
+        const remindersByDate = new Map();
+
+        tickets.forEach((ticket, index) => {
+          if (!ticket.ticketReminderAt) return;
+          const reminderDate = new Date(ticket.ticketReminderAt);
+          const key = localDateKey(reminderDate);
+          const reminders = remindersByDate.get(key) || [];
+          reminders.push({ ticket, index, reminderDate });
+          remindersByDate.set(key, reminders);
+        });
+
+        document.getElementById("calendar-month-label").textContent =
+          monthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+        const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+          .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
+          .join("");
+        const days = Array.from({ length: gridDayCount }, (_, dayOffset) => {
+          const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + dayOffset);
+          const dayKey = localDateKey(day);
+          const dayReminders = (remindersByDate.get(dayKey) || [])
+            .sort((left, right) => left.reminderDate - right.reminderDate)
+            .map(({ ticket, reminderDate }) => `
+              <div class="calendar-event">
+                ${reminderDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                · ${escapeHtml(ticket.ticketNumber)}
+                (${ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes} min)
+              </div>
+            `)
+            .join("");
+          const dayClass = [
+            "calendar-day",
+            day.getMonth() !== month ? "calendar-day-other-month" : "",
+            dayKey === todayKey ? "calendar-day-today" : "",
+          ].filter(Boolean).join(" ");
+          return `
+            <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
+              <div class="calendar-day-number">${day.getDate()}</div>
+              ${dayReminders}
+            </div>
+          `;
+        }).join("");
+        document.getElementById("calendar-grid").innerHTML = weekdays + days;
+      }
+
+      function localDateKey(date) {
+        return [
+          date.getFullYear(),
+          String(date.getMonth() + 1).padStart(2, "0"),
+          String(date.getDate()).padStart(2, "0"),
+        ].join("-");
       }
 
       function openTicketSearch() {
@@ -2240,6 +2369,7 @@
                           <p data-reminder-at="${ticket.ticketReminderAt}">
                             Reminder in ${formatCountdown(Date.parse(ticket.ticketReminderAt) - Date.now())}
                           </p>
+                            <p>Task duration: ${ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes} minutes</p>
                           <button class="delete-btn" onclick="event.stopPropagation(); cancelTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
                             Cancel Reminder
                           </button>
@@ -2250,6 +2380,17 @@
                             id="reminder${index}"
                             type="datetime-local"
                             min="${toLocalDateTimeValue(new Date())}"
+                            ${isLocked ? "disabled" : ""}
+                          >
+                          <label for="reminder-duration${index}">Task duration (minutes)</label>
+                          <input
+                            id="reminder-duration${index}"
+                            class="reminder-duration"
+                            type="number"
+                            min="1"
+                            max="1440"
+                            step="1"
+                            value="${defaultReminderDurationMinutes}"
                             ${isLocked ? "disabled" : ""}
                           >
                           <button class="btn set-reminder-btn" onclick="event.stopPropagation(); setTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
@@ -2273,6 +2414,7 @@
           tickets.filter((ticket) => ticket.status.includes("Pending")).length;
         document.getElementById("c").innerText =
           tickets.filter((ticket) => isClosedCategoryStatus(ticket.status)).length;
+        renderCalendar();
       }
 
       function toLocalDateTimeValue(date) {
@@ -2280,8 +2422,6 @@
         return localDate.toISOString().slice(0, 16);
       }
 
-      checkStatusReminders();
-      setInterval(checkStatusReminders, 60 * 1000);
       checkResolvedTickets();
       setInterval(checkResolvedTickets, 60 * 1000);
       checkTicketReminders();
@@ -2289,8 +2429,6 @@
         checkTicketReminders();
         updateReminderCountdowns();
       }, 1000);
-      checkHourlyReminder();
-      setInterval(checkHourlyReminder, 15 * 1000);
       setTheme(activeTheme);
       document.body.classList.toggle("color-blind-mode", colorBlindMode);
       document.getElementById("color-blind-toggle").textContent =

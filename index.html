@@ -649,7 +649,7 @@
 
       .calendar-day-events {
         position: relative;
-        height: 420px;
+        height: 840px;
         background-image: repeating-linear-gradient(
           to bottom,
           transparent 0,
@@ -665,7 +665,7 @@
 
       .calendar-time-scale {
         position: relative;
-        height: 420px;
+        height: 840px;
         color: #788493;
         font-size: 0.7rem;
         text-align: right;
@@ -673,7 +673,7 @@
 
       .calendar-time-scale span {
         position: absolute;
-        top: calc(var(--hour) * 60px - 8px);
+        top: calc(var(--slot) * 60px - 8px);
         right: 4px;
         white-space: nowrap;
       }
@@ -2357,27 +2357,22 @@
 
       function renderCalendarEvent(event) {
         if (event.type === "closed") {
-          return `<div class="calendar-event calendar-event-closed">Closed - ${escapeHtml(String(event.ticket.ticketNumber || "Ticket"))}</div>`;
+          return `<div class="calendar-event calendar-event-closed">${escapeHtml(String(event.ticket.ticketNumber || "Ticket"))}</div>`;
         }
         const isSpecial = event.type === "special";
-        const ticketNumber = isSpecial
+        const eventLabel = isSpecial
           ? "Hypred app"
           : escapeHtml(String(event.ticket.ticketNumber || "Ticket"));
-        const timeLabel = event.date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-        const duration = isSpecial
-          ? 30
-          : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
         const className = `calendar-event${isSpecial ? " calendar-event-special" : ""}`;
-        const title = `${timeLabel} - ${ticketNumber} (${duration} min)`;
         return `
           <button
             class="${className}"
             type="button"
             style="top: ${event.top}px; left: calc(${event.leftPercent}% + 2px); width: calc(${event.widthPercent}% - 4px); height: ${event.height}px;"
-            title="${escapeAttribute(title)}"
+            title="${escapeAttribute(eventLabel)}"
             ${isSpecial ? "disabled" : `onclick="openReminderEditor(${event.ticketIndex})" ${isTicketLocked(event.ticket) ? "disabled" : ""}`}
           >
-            ${title}
+            ${eventLabel}
           </button>
         `;
       }
@@ -2392,7 +2387,7 @@
             ...event,
             startMinute,
             endMinute: startMinute + durationMinutes,
-            height: Math.max(durationMinutes, 22),
+            height: Math.max(durationMinutes * 2, 28),
           };
         }).sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
 
@@ -2413,7 +2408,7 @@
           assignments.forEach((event) => {
             positionedEvents.push({
               ...event,
-              top: event.startMinute,
+              top: event.startMinute * 2,
               leftPercent: event.lane * 100 / laneCount,
               widthPercent: 100 / laneCount,
             });
@@ -2462,9 +2457,13 @@
         const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
-        const timeScale = Array.from({ length: 8 }, (_, hour) => `
-          <span style="--hour: ${hour}">${hour === 0 ? "8 AM" : hour < 4 ? `${8 + hour} AM` : hour === 4 ? "12 PM" : `${hour - 4} PM`}</span>
-        `).join("");
+        const timeScale = Array.from({ length: 15 }, (_, halfHour) => {
+          const totalMinutes = 8 * 60 + halfHour * 30;
+          const hour = Math.floor(totalMinutes / 60);
+          const minute = totalMinutes % 60;
+          const label = `${hour % 12 || 12}${minute ? ":30" : ""} ${hour < 12 ? "AM" : "PM"}`;
+          return `<span style="--slot: ${halfHour}">${label}</span>`;
+        }).join("");
         const dayCells = Array.from({ length: 5 }, (_, dayOffset) => {
           const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
           const dayKey = localDateKey(day);

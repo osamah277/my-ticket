@@ -644,7 +644,33 @@
       }
 
       .calendar-day {
-        min-height: 110px;
+        vertical-align: top;
+      }
+
+      .calendar-day-events {
+        position: relative;
+        height: 420px;
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 59px,
+          #e4e9ef 59px,
+          #e4e9ef 60px
+        );
+      }
+
+      .calendar-event-closed-list {
+        display: grid;
+        gap: 4px;
+        margin-top: 6px;
+      }
+
+      .calendar-time-labels {
+        display: flex;
+        justify-content: space-between;
+        padding: 2px 4px;
+        color: #788493;
+        font-size: 0.7rem;
       }
 
       .calendar-day-today {
@@ -657,9 +683,10 @@
       }
 
       .calendar-event {
-        display: block;
-        width: 100%;
-        margin: 4px 0;
+        position: absolute;
+        z-index: 1;
+        min-width: 0;
+        margin: 0;
         padding: 4px;
         border: 0;
         border-radius: 4px;
@@ -669,6 +696,7 @@
         font-size: 0.8rem;
         text-align: left;
         cursor: pointer;
+        overflow: hidden;
       }
 
       .calendar-event:hover:not(:disabled) {
@@ -733,6 +761,20 @@
       .dark-mode .calendar-weekday,
       .dark-mode .calendar-day {
         border-color: #3a4351;
+      }
+
+      .dark-mode .calendar-day-events {
+        background-image: repeating-linear-gradient(
+          to bottom,
+          transparent 0,
+          transparent 59px,
+          #3a4351 59px,
+          #3a4351 60px
+        );
+      }
+
+      .dark-mode .calendar-time-labels {
+        color: #aab4c2;
       }
 
       .dark-mode .calendar-event {
@@ -2303,26 +2345,79 @@
       }
 
       function renderCalendarEvent(event) {
-        if (event.type === "special") {
-          return '<div class="calendar-event calendar-event-special">2:30 PM - Hypred app</div>';
+        if (event.type === "closed") {
+          return `<div class="calendar-event calendar-event-closed">Closed - ${escapeHtml(String(event.ticket.ticketNumber || "Ticket"))}</div>`;
         }
-        const isClosed = event.type === "closed";
-        const ticketNumber = escapeHtml(String(event.ticket.ticketNumber || "Ticket"));
-        if (isClosed) {
-          return `<div class="calendar-event calendar-event-closed">Closed - ${ticketNumber}</div>`;
-        }
+        const isSpecial = event.type === "special";
+        const ticketNumber = isSpecial
+          ? "Hypred app"
+          : escapeHtml(String(event.ticket.ticketNumber || "Ticket"));
         const timeLabel = event.date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
-        const duration = event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+        const duration = isSpecial
+          ? 30
+          : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+        const className = `calendar-event${isSpecial ? " calendar-event-special" : ""}`;
+        const title = `${timeLabel} - ${ticketNumber} (${duration} min)`;
         return `
           <button
-            class="calendar-event"
+            class="${className}"
             type="button"
-            onclick="openReminderEditor(${event.ticketIndex})"
-            ${isTicketLocked(event.ticket) ? "disabled" : ""}
+            style="top: ${event.top}px; left: calc(${event.leftPercent}% + 2px); width: calc(${event.widthPercent}% - 4px); height: ${event.height}px;"
+            title="${escapeAttribute(title)}"
+            ${isSpecial ? "disabled" : `onclick="openReminderEditor(${event.ticketIndex})" ${isTicketLocked(event.ticket) ? "disabled" : ""}`}
           >
-            ${timeLabel} - ${ticketNumber} (${duration} min)
+            ${title}
           </button>
         `;
+      }
+
+      function layoutCalendarEvents(events) {
+        const intervals = events.map((event) => {
+          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - 8 * 60;
+          const durationMinutes = event.type === "special"
+            ? 30
+            : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+          return {
+            ...event,
+            startMinute,
+            endMinute: startMinute + durationMinutes,
+            height: Math.max(durationMinutes, 22),
+          };
+        }).sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
+
+        const positionedEvents = [];
+        let cluster = [];
+        let clusterEnd = -Infinity;
+
+        function positionCluster() {
+          if (!cluster.length) return;
+          const laneEnds = [];
+          const assignments = cluster.map((event) => {
+            let lane = laneEnds.findIndex((end) => end <= event.startMinute);
+            if (lane < 0) lane = laneEnds.length;
+            laneEnds[lane] = event.endMinute;
+            return { ...event, lane };
+          });
+          const laneCount = laneEnds.length;
+          assignments.forEach((event) => {
+            positionedEvents.push({
+              ...event,
+              top: event.startMinute,
+              leftPercent: event.lane * 100 / laneCount,
+              widthPercent: 100 / laneCount,
+            });
+          });
+          cluster = [];
+          clusterEnd = -Infinity;
+        }
+
+        intervals.forEach((event) => {
+          if (cluster.length && event.startMinute >= clusterEnd) positionCluster();
+          cluster.push(event);
+          clusterEnd = Math.max(clusterEnd, event.endMinute);
+        });
+        positionCluster();
+        return positionedEvents;
       }
 
       function renderCalendar() {
@@ -2359,14 +2454,21 @@
         const dayCells = Array.from({ length: 5 }, (_, dayOffset) => {
           const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
           const dayKey = localDateKey(day);
-          const dayEvents = (eventsByDate.get(dayKey) || [])
+          const dayEvents = eventsByDate.get(dayKey) || [];
+          const closedEvents = dayEvents
+            .filter((event) => event.type === "closed")
             .map(renderCalendarEvent)
             .join("");
+          const scheduledEvents = layoutCalendarEvents(
+            dayEvents.filter((event) => event.type !== "closed")
+          ).map(renderCalendarEvent).join("");
           const dayClass = `calendar-day${dayKey === localDateKey(new Date()) ? " calendar-day-today" : ""}`;
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
               <div class="calendar-day-number">${day.getDate()}</div>
-              ${dayEvents}
+              <div class="calendar-time-labels"><span>8 AM</span><span>9 AM</span><span>10 AM</span><span>11 AM</span><span>12 PM</span><span>1 PM</span><span>2 PM</span><span>3 PM</span></div>
+              <div class="calendar-day-events">${scheduledEvents}</div>
+              ${closedEvents ? `<div class="calendar-event-closed-list">${closedEvents}</div>` : ""}
             </div>
           `;
         }).join("");

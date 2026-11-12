@@ -350,6 +350,28 @@
         margin-bottom: 12px;
       }
 
+      .page-navigation {
+        display: flex;
+        gap: 10px;
+        margin: 12px 0;
+      }
+
+      .page-tab {
+        padding: 10px 16px;
+        border: 1px solid #d3dce6;
+        border-radius: 6px;
+        color: inherit;
+        background: #fff;
+        font: inherit;
+        cursor: pointer;
+      }
+
+      .page-tab[aria-pressed="true"] {
+        border-color: #4a90e2;
+        color: #fff;
+        background: #4a90e2;
+      }
+
       .stat-filter {
         width: 100%;
         color: inherit;
@@ -581,15 +603,30 @@
         gap: 8px;
       }
 
+      .calendar-toolbar {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-bottom: 12px;
+      }
+
+      .calendar-toolbar h3 {
+        margin: 0;
+      }
+
       .calendar-grid-container {
         overflow-x: auto;
       }
 
       .calendar-grid {
+        min-width: 600px;
+      }
+
+      .calendar-week {
         display: grid;
-        grid-template-columns: repeat(7, minmax(90px, 1fr));
-        min-width: 630px;
-        border-top: 1px solid #d3dce6;
+        grid-template-columns: repeat(5, minmax(120px, 1fr));
         border-left: 1px solid #d3dce6;
       }
 
@@ -610,11 +647,6 @@
         min-height: 110px;
       }
 
-      .calendar-day-other-month {
-        color: #788493;
-        background: #f5f7fa;
-      }
-
       .calendar-day-today {
         box-shadow: inset 0 0 0 2px #4a90e2;
       }
@@ -625,17 +657,66 @@
       }
 
       .calendar-event {
+        display: block;
+        width: 100%;
         margin: 4px 0;
         padding: 4px;
+        border: 0;
         border-radius: 4px;
         color: #174b2d;
         background: #d9f3df;
         overflow-wrap: anywhere;
         font-size: 0.8rem;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .calendar-event:hover:not(:disabled) {
+        filter: brightness(0.94);
+      }
+
+      .calendar-event:disabled {
+        cursor: default;
+      }
+
+      .calendar-event-closed {
+        color: #243b65;
+        background: #dce8ff;
+        cursor: default;
+      }
+
+      .calendar-unscheduled {
+        margin-top: 16px;
+      }
+
+      .calendar-unscheduled summary {
+        padding: 8px 0;
+        cursor: pointer;
+      }
+
+      .unscheduled-ticket {
+        display: block;
+        width: 100%;
+        margin: 4px 0;
+        padding: 10px;
+        border: 1px solid #d3dce6;
+        border-radius: 6px;
+        color: inherit;
+        background: #fff;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .unscheduled-ticket:hover {
+        border-color: #4a90e2;
       }
 
       .dark-mode .calendar-grid {
         border-color: #3a4351;
+      }
+
+      .dark-mode .calendar-week {
+        border-left-color: #3a4351;
       }
 
       .dark-mode .calendar-weekday,
@@ -643,13 +724,26 @@
         border-color: #3a4351;
       }
 
-      .dark-mode .calendar-day-other-month {
-        background: #1c222c;
-      }
-
       .dark-mode .calendar-event {
         color: #e5e7eb;
         background: #24543a;
+      }
+
+      .dark-mode .calendar-event-closed {
+        color: #e5e7eb;
+        background: #35465c;
+      }
+
+      .dark-mode .page-tab,
+      .dark-mode .unscheduled-ticket {
+        color: #e5e7eb;
+        border-color: #3a4351;
+        background: #242b36;
+      }
+
+      .dark-mode .page-tab[aria-pressed="true"] {
+        color: #fff;
+        background: #4a90e2;
       }
 
       .reminder-duration {
@@ -827,6 +921,20 @@
           grid-template-columns: repeat(2, 1fr);
         }
 
+        .page-navigation,
+        .calendar-header {
+          align-items: stretch;
+          flex-direction: column;
+        }
+
+        .calendar-navigation {
+          flex-wrap: wrap;
+        }
+
+        .calendar-week {
+          grid-template-columns: repeat(5, minmax(110px, 1fr));
+        }
+
         .row,
         .toolbar {
           grid-template-columns: 1fr;
@@ -901,6 +1009,16 @@
         </div>
       </dialog>
 
+      <nav class="page-navigation" aria-label="Dashboard pages">
+        <button class="page-tab" type="button" aria-pressed="true" onclick="setActivePage('tickets')">
+          Tickets
+        </button>
+        <button class="page-tab" type="button" aria-pressed="false" onclick="setActivePage('calendar')">
+          Calendar
+        </button>
+      </nav>
+
+      <section id="ticket-page">
       <div class="stats">
         <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
           Total: <span id="t">0</span>
@@ -947,21 +1065,6 @@
         </select>
         <button class="btn" onclick="createTicket()">Create Ticket</button>
       </div>
-
-      <section class="card reminder-calendar" aria-labelledby="calendar-title">
-        <div class="calendar-header">
-          <h2 id="calendar-title">Reminder Calendar</h2>
-          <div class="calendar-navigation">
-            <button class="search-clear" type="button" onclick="changeCalendarMonth(-1)" aria-label="Previous month">Previous</button>
-            <button class="search-clear" type="button" onclick="goToCurrentMonth()">Today</button>
-            <button class="search-clear" type="button" onclick="changeCalendarMonth(1)" aria-label="Next month">Next</button>
-          </div>
-        </div>
-        <h3 id="calendar-month-label"></h3>
-        <div class="calendar-grid-container">
-          <div class="calendar-grid" id="calendar-grid" role="grid" aria-labelledby="calendar-title"></div>
-        </div>
-      </section>
 
       <div class="ticket-tools">
         <input
@@ -1069,6 +1172,48 @@
       <div id="load-more-container" hidden>
         <button class="btn" type="button" onclick="loadMoreTickets()">Load 20 more tickets</button>
       </div>
+      </section>
+
+      <section class="card reminder-calendar" id="calendar-page" aria-labelledby="calendar-title" hidden>
+        <div class="calendar-header">
+          <h2 id="calendar-title">Reminder Calendar</h2>
+        </div>
+        <p>Weekdays only. Schedule reminders from 8:00 AM to 3:00 PM; each task must finish by 3:00 PM.</p>
+        <div class="calendar-toolbar">
+          <h3 id="calendar-period-label"></h3>
+          <div class="calendar-navigation">
+            <button class="search-clear" type="button" onclick="changeCalendarWeek(-1)">Previous Week</button>
+            <button class="search-clear" type="button" onclick="goToCurrentWeek()">This Week</button>
+            <button class="search-clear" type="button" onclick="changeCalendarWeek(1)">Next Week</button>
+          </div>
+        </div>
+        <div id="calendar-view-content"></div>
+        <details class="calendar-unscheduled">
+          <summary>Tickets without reminders (<span id="unscheduled-ticket-count">0</span>)</summary>
+          <div id="unscheduled-ticket-list"></div>
+        </details>
+      </section>
+
+      <dialog class="search-dialog" id="calendar-reminder-dialog" aria-labelledby="calendar-reminder-title">
+        <div class="search-dialog-header">
+          <h2 id="calendar-reminder-title">Schedule Ticket Reminder</h2>
+          <button class="search-dialog-close" type="button" aria-label="Close reminder editor" onclick="closeReminderEditor()">&#215;</button>
+        </div>
+        <p id="calendar-reminder-ticket"></p>
+        <label for="calendar-reminder-time">Reminder date and time</label>
+        <input id="calendar-reminder-time" type="datetime-local" step="60">
+        <label for="calendar-reminder-duration">Task duration (minutes)</label>
+        <input id="calendar-reminder-duration" type="number" min="1" step="1" value="30">
+        <p>Schedule Monday-Friday, 8:00 AM-3:00 PM. The task must finish by 3:00 PM.</p>
+        <p class="delete-confirm-error" id="calendar-reminder-error" role="alert"></p>
+        <div class="search-dialog-actions">
+          <button class="delete-btn" id="calendar-reminder-cancel" type="button" onclick="cancelReminderFromEditor()" hidden>
+            Cancel Reminder
+          </button>
+          <button class="search-clear" type="button" onclick="closeReminderEditor()">Close</button>
+          <button class="btn" type="button" onclick="saveReminderFromEditor()">Save Reminder</button>
+        </div>
+      </dialog>
 
     </main>
 
@@ -1103,7 +1248,8 @@
       };
       let notificationQueue = [];
       let previousFocus = null;
-      let calendarMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+      let activePage = "tickets";
+      let calendarDate = new Date();
       let draggedTicket = null;
       let pendingTicketDeletion = null;
       let needsTicketMigrationSave = false;
@@ -1143,8 +1289,7 @@
           if (cleanedTicket.ticketReminderAt) {
             if (
               !Number.isInteger(cleanedTicket.ticketReminderDurationMinutes) ||
-              cleanedTicket.ticketReminderDurationMinutes < 1 ||
-              cleanedTicket.ticketReminderDurationMinutes > 1440
+              cleanedTicket.ticketReminderDurationMinutes < 1
             ) {
               cleanedTicket.ticketReminderDurationMinutes = defaultReminderDurationMinutes;
               needsTicketMigrationSave = true;
@@ -1296,6 +1441,7 @@
               notes: [],
             };
             if (status === "Resolved") ticket.resolvedAt = updatedAtIso;
+            if (status === "Closed") ticket.closedAt = updatedAtIso;
             tickets.push(ticket);
             knownNumbers.add(ticketNumber);
             importedCount += 1;
@@ -1766,6 +1912,7 @@
           notes: [],
         };
         if (ticket.status === "Resolved") ticket.resolvedAt = createdAt.toISOString();
+        if (ticket.status === "Closed") ticket.closedAt = createdAt.toISOString();
 
         tickets.push(ticket);
         save();
@@ -1858,6 +2005,11 @@
         } else {
           delete ticket.resolvedAt;
         }
+        if (status === "Closed") {
+          ticket.closedAt = changedAt.toISOString();
+        } else {
+          delete ticket.closedAt;
+        }
         save();
         render();
       }
@@ -1872,6 +2024,7 @@
           if (!Number.isFinite(resolvedAt) || resolvedAt + resolvedClosureInterval > now) return;
 
           ticket.status = "Closed";
+          ticket.closedAt = new Date(now).toISOString();
           ticket.notes.push({
             date: new Date(now).toLocaleString(),
             timestamp: now,
@@ -1921,41 +2074,70 @@
         }
 
         const reminderInput = document.getElementById(`reminder${index}`);
-        const reminderTime = Date.parse(reminderInput.value);
-        if (!reminderInput.value || Number.isNaN(reminderTime) || reminderTime <= Date.now()) {
-          pop("Choose a reminder time in the future");
+        const durationInput = document.getElementById(`reminder-duration${index}`);
+        const error = saveTicketReminder(index, reminderInput.value, durationInput.value);
+        if (error) {
+          pop(error);
           return;
         }
+        render();
+        document.getElementById(`detail-row-${index}`).hidden = false;
+        document.getElementById(`d${index}`).style.display = "block";
+        pop(`Reminder set for ticket ${ticket.ticketNumber}`, [ticket], "ticket-reminder");
+      }
 
-        const durationInput = document.getElementById(`reminder-duration${index}`);
-        const durationMinutes = Number(durationInput.value);
-        if (!Number.isInteger(durationMinutes) || durationMinutes < 1 || durationMinutes > 1440) {
-          pop("Task duration must be between 1 and 1440 minutes");
-          return;
+      function saveTicketReminder(index, dateTimeValue, durationValue) {
+        const ticket = tickets[index];
+        if (!ticket || isTicketLocked(ticket)) return "This ticket's reminder cannot be changed";
+
+        const reminderTime = Date.parse(dateTimeValue);
+        if (!dateTimeValue || !Number.isFinite(reminderTime) || reminderTime <= Date.now()) {
+          return "Choose a reminder time in the future";
+        }
+
+        const durationMinutes = Number(durationValue);
+        if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1) {
+          return "Task duration must be a positive whole number of minutes";
         }
 
         const reminderEnd = reminderTime + durationMinutes * 60 * 1000;
+        if (!Number.isFinite(reminderEnd) || Number.isNaN(new Date(reminderEnd).getTime())) {
+          return "Task duration is too long for the selected reminder time";
+        }
+        if (!isWithinSchedulingHours(reminderTime, durationMinutes)) {
+          return "Schedule Monday-Friday between 8:00 AM and 3:00 PM; the task must finish by 3:00 PM";
+        }
+
         const conflictingTicket = tickets.find((otherTicket, otherIndex) => {
           if (otherIndex === index || !otherTicket.ticketReminderAt) return false;
           const otherStart = Date.parse(otherTicket.ticketReminderAt);
-          const otherDuration = Number.isInteger(otherTicket.ticketReminderDurationMinutes)
+          const otherDuration = Number.isSafeInteger(otherTicket.ticketReminderDurationMinutes)
             ? otherTicket.ticketReminderDurationMinutes
             : defaultReminderDurationMinutes;
           const otherEnd = otherStart + otherDuration * 60 * 1000;
           return reminderTime < otherEnd && reminderEnd > otherStart;
         });
         if (conflictingTicket) {
-          pop(`This time overlaps the reminder for ticket ${conflictingTicket.ticketNumber}`);
-          return;
+          return `This time overlaps the reminder for ticket ${conflictingTicket.ticketNumber}`;
         }
 
         ticket.ticketReminderAt = new Date(reminderTime).toISOString();
         ticket.ticketReminderDurationMinutes = durationMinutes;
         save();
-        render();
-        document.getElementById(`detail-row-${index}`).hidden = false;
-        document.getElementById(`d${index}`).style.display = "block";
-        pop(`Reminder set for ticket ${ticket.ticketNumber}`, [ticket], "ticket-reminder");
+        return "";
+      }
+
+      function isWithinSchedulingHours(reminderTime, durationMinutes) {
+        const start = new Date(reminderTime);
+        const end = new Date(reminderTime + durationMinutes * 60 * 1000);
+        if (start.getDay() === 0 || start.getDay() === 6 || localDateKey(start) !== localDateKey(end)) {
+          return false;
+        }
+        const opening = new Date(start);
+        opening.setHours(8, 0, 0, 0);
+        const closing = new Date(start);
+        closing.setHours(15, 0, 0, 0);
+        return start >= opening && end <= closing;
       }
 
       function cancelTicketReminder(index) {
@@ -2006,67 +2188,119 @@
         resetTicketList();
       }
 
-      function changeCalendarMonth(offset) {
-        calendarMonth = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + offset, 1);
+      function setActivePage(page) {
+        if (page !== "tickets" && page !== "calendar") return;
+        activePage = page;
+        document.getElementById("ticket-page").hidden = page !== "tickets";
+        document.getElementById("calendar-page").hidden = page !== "calendar";
+        document.querySelectorAll(".page-tab").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.textContent.trim().toLowerCase() === page));
+        });
+        if (page === "calendar") renderCalendar();
+        else updateTableWidth();
+      }
+
+      function goToCurrentWeek() {
+        calendarDate = new Date();
         renderCalendar();
       }
 
-      function goToCurrentMonth() {
-        const now = new Date();
-        calendarMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      function changeCalendarWeek(offset) {
+        calendarDate = new Date(
+          calendarDate.getFullYear(),
+          calendarDate.getMonth(),
+          calendarDate.getDate() + offset * 7
+        );
         renderCalendar();
+      }
+
+      function getCalendarEvents() {
+        const events = [];
+        tickets.forEach((ticket, ticketIndex) => {
+          if (ticket.ticketReminderAt) {
+            const reminderTime = Date.parse(ticket.ticketReminderAt);
+            if (Number.isFinite(reminderTime)) {
+              events.push({ ticket, ticketIndex, date: new Date(reminderTime), type: "reminder" });
+            }
+          }
+          if (ticket.status === "Closed") {
+            const closedTime = Date.parse(ticket.closedAt || ticket.lastUpdateAt || ticket.createdAt);
+            if (Number.isFinite(closedTime)) {
+              events.push({ ticket, ticketIndex, date: new Date(closedTime), type: "closed" });
+            }
+          }
+        });
+        return events.sort((left, right) => left.date - right.date);
+      }
+
+      function renderCalendarEvent(event) {
+        const isClosed = event.type === "closed";
+        const ticketNumber = escapeHtml(String(event.ticket.ticketNumber || "Ticket"));
+        if (isClosed) {
+          return `<div class="calendar-event calendar-event-closed">Closed - ${ticketNumber}</div>`;
+        }
+        const timeLabel = event.date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        const duration = event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+        return `
+          <button
+            class="calendar-event"
+            type="button"
+            onclick="openReminderEditor(${event.ticketIndex})"
+            ${isTicketLocked(event.ticket) ? "disabled" : ""}
+          >
+            ${timeLabel} - ${ticketNumber} (${duration} min)
+          </button>
+        `;
       }
 
       function renderCalendar() {
-        const year = calendarMonth.getFullYear();
-        const month = calendarMonth.getMonth();
-        const monthStart = new Date(year, month, 1);
-        const daysInMonth = new Date(year, month + 1, 0).getDate();
-        const gridStart = new Date(year, month, 1 - monthStart.getDay());
-        const gridDayCount = Math.ceil((monthStart.getDay() + daysInMonth) / 7) * 7;
-        const todayKey = localDateKey(new Date());
-        const remindersByDate = new Map();
-
-        tickets.forEach((ticket, index) => {
-          if (!ticket.ticketReminderAt) return;
-          const reminderDate = new Date(ticket.ticketReminderAt);
-          const key = localDateKey(reminderDate);
-          const reminders = remindersByDate.get(key) || [];
-          reminders.push({ ticket, index, reminderDate });
-          remindersByDate.set(key, reminders);
+        const weekStart = new Date(
+          calendarDate.getFullYear(),
+          calendarDate.getMonth(),
+          calendarDate.getDate()
+        );
+        weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7));
+        const weekEnd = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 5);
+        const weekLabel = `${weekStart.toLocaleDateString(undefined, {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })} - ${new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 4)
+          .toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })}`;
+        const weekEvents = getCalendarEvents().filter(
+          (event) => event.date >= weekStart && event.date < weekEnd
+        );
+        const eventsByDate = new Map();
+        weekEvents.forEach((event) => {
+          const key = localDateKey(event.date);
+          const dayEvents = eventsByDate.get(key) || [];
+          dayEvents.push(event);
+          eventsByDate.set(key, dayEvents);
         });
-
-        document.getElementById("calendar-month-label").textContent =
-          monthStart.toLocaleDateString(undefined, { month: "long", year: "numeric" });
-        const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"]
+        const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
-        const days = Array.from({ length: gridDayCount }, (_, dayOffset) => {
-          const day = new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + dayOffset);
+        const dayCells = Array.from({ length: 5 }, (_, dayOffset) => {
+          const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
           const dayKey = localDateKey(day);
-          const dayReminders = (remindersByDate.get(dayKey) || [])
-            .sort((left, right) => left.reminderDate - right.reminderDate)
-            .map(({ ticket, reminderDate }) => `
-              <div class="calendar-event">
-                ${reminderDate.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
-                · ${escapeHtml(ticket.ticketNumber)}
-                (${ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes} min)
-              </div>
-            `)
+          const dayEvents = (eventsByDate.get(dayKey) || [])
+            .map(renderCalendarEvent)
             .join("");
-          const dayClass = [
-            "calendar-day",
-            day.getMonth() !== month ? "calendar-day-other-month" : "",
-            dayKey === todayKey ? "calendar-day-today" : "",
-          ].filter(Boolean).join(" ");
+          const dayClass = `calendar-day${dayKey === localDateKey(new Date()) ? " calendar-day-today" : ""}`;
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
               <div class="calendar-day-number">${day.getDate()}</div>
-              ${dayReminders}
+              ${dayEvents}
             </div>
           `;
         }).join("");
-        document.getElementById("calendar-grid").innerHTML = weekdays + days;
+        const grid = `<div class="calendar-grid-container"><div class="calendar-grid" role="grid">
+          <div class="calendar-week" role="row">${weekdays}</div>
+          <div class="calendar-week" role="row">${dayCells}</div>
+        </div></div>`;
+        document.getElementById("calendar-period-label").textContent = weekLabel;
+        document.getElementById("calendar-view-content").innerHTML = grid;
+        renderUnscheduledTickets();
       }
 
       function localDateKey(date) {
@@ -2075,6 +2309,77 @@
           String(date.getMonth() + 1).padStart(2, "0"),
           String(date.getDate()).padStart(2, "0"),
         ].join("-");
+      }
+
+      function renderUnscheduledTickets() {
+        const availableTickets = tickets
+          .map((ticket, index) => ({ ticket, index }))
+          .filter(({ ticket }) => !ticket.ticketReminderAt && !isTicketLocked(ticket));
+        document.getElementById("unscheduled-ticket-count").textContent = String(availableTickets.length);
+        document.getElementById("unscheduled-ticket-list").innerHTML = availableTickets.length
+          ? availableTickets.map(({ ticket, index }) => `
+            <button class="unscheduled-ticket" type="button" onclick="openReminderEditor(${index})">
+              <strong>${escapeHtml(String(ticket.ticketNumber || "Ticket"))}</strong>
+              ${ticket.shortDescription ? ` - ${escapeHtml(String(ticket.shortDescription))}` : ""}
+            </button>
+          `).join("")
+          : "<p>All editable tickets already have a reminder.</p>";
+      }
+
+      let editingReminderIndex = -1;
+
+      function openReminderEditor(index) {
+        const ticket = tickets[index];
+        if (!ticket || isTicketLocked(ticket)) return;
+        editingReminderIndex = index;
+        const hasReminder = Boolean(ticket.ticketReminderAt);
+        document.getElementById("calendar-reminder-title").textContent =
+          hasReminder ? "Edit Ticket Reminder" : "Schedule Ticket Reminder";
+        document.getElementById("calendar-reminder-ticket").textContent =
+          `Ticket ${ticket.ticketNumber}${ticket.shortDescription ? ` - ${ticket.shortDescription}` : ""}`;
+        document.getElementById("calendar-reminder-time").value = hasReminder
+          ? toLocalDateTimeValue(new Date(ticket.ticketReminderAt))
+          : "";
+        document.getElementById("calendar-reminder-duration").value =
+          String(ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes);
+        document.getElementById("calendar-reminder-error").textContent = "";
+        document.getElementById("calendar-reminder-cancel").hidden = !hasReminder;
+        document.getElementById("calendar-reminder-dialog").showModal();
+      }
+
+      function closeReminderEditor() {
+        const dialog = document.getElementById("calendar-reminder-dialog");
+        if (dialog.open) dialog.close();
+        editingReminderIndex = -1;
+      }
+
+      function saveReminderFromEditor() {
+        if (editingReminderIndex < 0) return;
+        const ticketIndex = editingReminderIndex;
+        const ticket = tickets[ticketIndex];
+        const wasScheduled = Boolean(ticket.ticketReminderAt);
+        const error = saveTicketReminder(
+          ticketIndex,
+          document.getElementById("calendar-reminder-time").value,
+          document.getElementById("calendar-reminder-duration").value
+        );
+        if (error) {
+          document.getElementById("calendar-reminder-error").textContent = error;
+          return;
+        }
+        closeReminderEditor();
+        render();
+        pop(
+          `Reminder ${wasScheduled ? "updated" : "set"} for ticket ${ticket.ticketNumber}`,
+          [ticket],
+          "ticket-reminder"
+        );
+      }
+
+      function cancelReminderFromEditor() {
+        if (editingReminderIndex < 0) return;
+        cancelTicketReminder(editingReminderIndex);
+        closeReminderEditor();
       }
 
       function openTicketSearch() {
@@ -2369,7 +2674,10 @@
                           <p data-reminder-at="${ticket.ticketReminderAt}">
                             Reminder in ${formatCountdown(Date.parse(ticket.ticketReminderAt) - Date.now())}
                           </p>
-                            <p>Task duration: ${ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes} minutes</p>
+                          <p>Task duration: ${ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes} minutes</p>
+                          <button class="search-clear" onclick="event.stopPropagation(); openReminderEditor(${index})" ${isLocked ? "disabled" : ""}>
+                            Edit Reminder
+                          </button>
                           <button class="delete-btn" onclick="event.stopPropagation(); cancelTicketReminder(${index})" ${isLocked ? "disabled" : ""}>
                             Cancel Reminder
                           </button>
@@ -2379,16 +2687,17 @@
                           <input
                             id="reminder${index}"
                             type="datetime-local"
+                            step="60"
                             min="${toLocalDateTimeValue(new Date())}"
                             ${isLocked ? "disabled" : ""}
                           >
+                          <p>Schedule Monday-Friday between 8:00 AM and 3:00 PM; the task must finish by 3:00 PM.</p>
                           <label for="reminder-duration${index}">Task duration (minutes)</label>
                           <input
                             id="reminder-duration${index}"
                             class="reminder-duration"
                             type="number"
                             min="1"
-                            max="1440"
                             step="1"
                             value="${defaultReminderDurationMinutes}"
                             ${isLocked ? "disabled" : ""}
@@ -2414,7 +2723,7 @@
           tickets.filter((ticket) => ticket.status.includes("Pending")).length;
         document.getElementById("c").innerText =
           tickets.filter((ticket) => isClosedCategoryStatus(ticket.status)).length;
-        renderCalendar();
+        if (activePage === "calendar") renderCalendar();
       }
 
       function toLocalDateTimeValue(date) {

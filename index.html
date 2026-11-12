@@ -724,6 +724,12 @@
         cursor: default;
       }
 
+      .calendar-event-closed-outside {
+        padding: 4px;
+        border-radius: 4px;
+        overflow-wrap: anywhere;
+      }
+
       .calendar-event-special {
         color: #4a3510;
         background: #fff0bf;
@@ -2357,7 +2363,19 @@
 
       function renderCalendarEvent(event) {
         if (event.type === "closed") {
-          return `<div class="calendar-event calendar-event-closed">${escapeHtml(String(event.ticket.ticketNumber || "Ticket"))}</div>`;
+          const label = `${escapeHtml(String(event.ticket.ticketNumber || "Ticket"))} - Closed ${event.date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
+          if (event.top === undefined) {
+            return `<div class="calendar-event-closed calendar-event-closed-outside">${label}</div>`;
+          }
+          return `
+            <div
+              class="calendar-event calendar-event-closed"
+              style="top: ${event.top}px; left: calc(${event.leftPercent}% + 2px); width: calc(${event.widthPercent}% - 4px); height: ${event.height}px;"
+              title="${escapeAttribute(label)}"
+            >
+              ${label}
+            </div>
+          `;
         }
         const isSpecial = event.type === "special";
         const eventLabel = isSpecial
@@ -2380,14 +2398,16 @@
       function layoutCalendarEvents(events) {
         const intervals = events.map((event) => {
           const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - 8 * 60;
-          const durationMinutes = event.type === "special"
-            ? 30
-            : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+          const durationMinutes = event.type === "closed"
+            ? 1
+            : event.type === "special"
+              ? 30
+              : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
           return {
             ...event,
             startMinute,
             endMinute: startMinute + durationMinutes,
-            height: Math.max(durationMinutes * 2, 28),
+            height: event.type === "closed" ? 28 : Math.max(durationMinutes * 2, 28),
           };
         }).sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
 
@@ -2468,19 +2488,21 @@
           const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
           const dayKey = localDateKey(day);
           const dayEvents = eventsByDate.get(dayKey) || [];
-          const closedEvents = dayEvents
+          const closedOutsideHours = dayEvents
             .filter((event) => event.type === "closed")
+            .filter((event) => event.date.getHours() < 8 || event.date.getHours() >= 15)
             .map(renderCalendarEvent)
             .join("");
-          const scheduledEvents = layoutCalendarEvents(
-            dayEvents.filter((event) => event.type !== "closed")
-          ).map(renderCalendarEvent).join("");
+          const timedEvents = dayEvents.filter((event) =>
+            event.type !== "closed" || (event.date.getHours() >= 8 && event.date.getHours() < 15)
+          );
+          const scheduledEvents = layoutCalendarEvents(timedEvents).map(renderCalendarEvent).join("");
           const dayClass = `calendar-day${dayKey === localDateKey(new Date()) ? " calendar-day-today" : ""}`;
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
               <div class="calendar-day-number">${day.getDate()}</div>
               <div class="calendar-day-events">${scheduledEvents}</div>
-              ${closedEvents ? `<div class="calendar-event-closed-list">${closedEvents}</div>` : ""}
+              ${closedOutsideHours ? `<div class="calendar-event-closed-list">${closedOutsideHours}</div>` : ""}
             </div>
           `;
         }).join("");

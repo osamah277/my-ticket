@@ -664,6 +664,39 @@
         outline-offset: -2px;
       }
 
+      .calendar-now-line {
+        position: absolute;
+        z-index: 3;
+        right: 0;
+        left: 0;
+        height: 2px;
+        background: #dc2626;
+        pointer-events: none;
+      }
+
+      .calendar-now-line::before {
+        position: absolute;
+        top: -3px;
+        left: -3px;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #dc2626;
+        content: "";
+      }
+
+      .calendar-now-line span {
+        position: absolute;
+        right: 2px;
+        bottom: 3px;
+        padding: 2px 4px;
+        border-radius: 3px;
+        color: #fff;
+        background: #dc2626;
+        font-size: 0.7rem;
+        white-space: nowrap;
+      }
+
       .calendar-time-rail {
         vertical-align: top;
       }
@@ -801,6 +834,12 @@
           #3a4351 59px,
           #3a4351 60px
         );
+      }
+
+      .dark-mode .calendar-now-line,
+      .dark-mode .calendar-now-line::before,
+      .dark-mode .calendar-now-line span {
+        background: #f87171;
       }
 
       .dark-mode .calendar-time-scale {
@@ -2569,6 +2608,9 @@
           );
           const scheduledEvents = layoutCalendarEvents(timedEvents).map(renderCalendarEvent).join("");
           const dayClass = `calendar-day${dayKey === localDateKey(new Date()) ? " calendar-day-today" : ""}`;
+          const nowIndicator = dayKey === localDateKey(new Date())
+            ? '<div class="calendar-now-line" data-calendar-now hidden><span></span></div>'
+            : "";
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
               <div class="calendar-day-number">${day.getDate()}</div>
@@ -2578,7 +2620,7 @@
                 ondragover="dragOverCalendarDay(event)"
                 ondragleave="if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.classList.remove('calendar-drop-target')"
                 ondrop="dropCalendarReminder(event)"
-              >${scheduledEvents}</div>
+              >${scheduledEvents}${nowIndicator}</div>
               ${closedOutsideHours ? `<div class="calendar-event-closed-list">${closedOutsideHours}</div>` : ""}
             </div>
           `;
@@ -2596,6 +2638,7 @@
         document.getElementById("calendar-period-label").textContent = weekLabel;
         document.getElementById("calendar-view-content").innerHTML = grid;
         renderUnscheduledTickets();
+        updateCalendarCurrentTime();
       }
 
       function localDateKey(date) {
@@ -2604,6 +2647,21 @@
           String(date.getMonth() + 1).padStart(2, "0"),
           String(date.getDate()).padStart(2, "0"),
         ].join("-");
+      }
+
+      function updateCalendarCurrentTime() {
+        const now = new Date();
+        const minuteOfDay = now.getHours() * 60 + now.getMinutes();
+        const isVisible = minuteOfDay >= calendarDisplayStartMinute &&
+          minuteOfDay <= calendarDisplayEndMinute;
+        document.querySelectorAll("[data-calendar-now]").forEach((indicator) => {
+          indicator.hidden = !isVisible;
+          if (!isVisible) return;
+          indicator.style.top =
+            `${(minuteOfDay - calendarDisplayStartMinute) * calendarPixelsPerMinute}px`;
+          indicator.querySelector("span").textContent =
+            now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+        });
       }
 
       function isWithinCalendarDisplayHours(date) {
@@ -3040,6 +3098,7 @@
       setInterval(() => {
         checkTicketReminders();
         updateReminderCountdowns();
+        updateCalendarCurrentTime();
       }, 1000);
       setInterval(checkHypredAppReminder, 30 * 1000);
       setTheme(activeTheme);

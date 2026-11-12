@@ -685,6 +685,17 @@
         cursor: default;
       }
 
+      .calendar-event-special {
+        color: #4a3510;
+        background: #fff0bf;
+        cursor: default;
+      }
+
+      .dark-mode .calendar-event-special {
+        color: #f5e7be;
+        background: #5b4923;
+      }
+
       .calendar-unscheduled {
         margin-top: 16px;
       }
@@ -868,10 +879,21 @@
         background: #f3e8ff;
       }
 
+      .notif-dialog.hypred-reminder {
+        border: 3px solid #b7791f;
+        background: #fff8df;
+      }
+
       .dark-mode .notif-dialog.ticket-reminder {
         color: #1f3b2b;
         border-color: #86c99b;
         background: #d9f3df;
+      }
+
+      .dark-mode .notif-dialog.hypred-reminder {
+        color: #f5e7be;
+        border-color: #d6a64f;
+        background: #3e3524;
       }
 
       .notif-dialog h2 {
@@ -952,7 +974,7 @@
       <section class="notif-dialog" role="dialog" aria-modal="true" aria-labelledby="notification-title" aria-describedby="notification-message">
         <h2 id="notification-title">Notification</h2>
         <p id="notification-message"></p>
-        <button type="button" onclick="dismissNotification()">Okay</button>
+        <button type="button" onclick="confirmNotification()">Okay</button>
       </section>
     </div>
     <main id="app-content">
@@ -1228,6 +1250,7 @@
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const resolvedClosureInterval = 5 * 24 * 60 * 60 * 1000;
       const defaultReminderDurationMinutes = 30;
+      const hypredReminderCompletionStorageKey = "ticket_dashboard_hypred_completed_date";
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
@@ -1247,6 +1270,7 @@
         sort: "",
       };
       let notificationQueue = [];
+      let activeNotification = null;
       let previousFocus = null;
       let activePage = "tickets";
       let calendarDate = new Date();
@@ -1682,8 +1706,8 @@
         render();
       }
 
-      function pop(message, linkedTickets = [], type = "default") {
-        const notification = { message, linkedTickets, type };
+      function pop(message, linkedTickets = [], type = "default", occurrenceDate = "") {
+        const notification = { message, linkedTickets, type, occurrenceDate };
         if (document.getElementById("n").style.display === "flex") {
           notificationQueue.push(notification);
           return;
@@ -1694,9 +1718,14 @@
       }
 
       function showNotification(notification) {
+        activeNotification = notification;
         document.querySelector(".notif-dialog").classList.toggle(
           "ticket-reminder",
           notification.type === "ticket-reminder"
+        );
+        document.querySelector(".notif-dialog").classList.toggle(
+          "hypred-reminder",
+          notification.type === "hypred-reminder"
         );
         const messageElement = document.getElementById("notification-message");
         messageElement.replaceChildren();
@@ -1733,10 +1762,26 @@
 
         document.getElementById("app-content").inert = true;
         document.getElementById("n").style.display = "flex";
-        document.querySelector(".notif-dialog button").focus();
+        const confirmButton = document.querySelector(".notif-dialog button");
+        confirmButton.textContent = notification.type === "hypred-reminder"
+          ? "Confirm completion"
+          : "Okay";
+        confirmButton.focus();
+      }
+
+      function confirmNotification() {
+        if (activeNotification?.type === "hypred-reminder") {
+          localStorage.setItem(
+            hypredReminderCompletionStorageKey,
+            activeNotification.occurrenceDate
+          );
+          activeNotification = null;
+        }
+        dismissNotification();
       }
 
       function dismissNotification() {
+        if (activeNotification?.type === "hypred-reminder") return;
         if (notificationQueue.length > 0) {
           showNotification(notificationQueue.shift());
           return;
@@ -1744,6 +1789,7 @@
 
         document.getElementById("n").style.display = "none";
         document.getElementById("app-content").inert = false;
+        activeNotification = null;
         if (previousFocus instanceof HTMLElement && previousFocus.isConnected) {
           previousFocus.focus();
         }
@@ -2183,6 +2229,29 @@
         }
       }
 
+      function checkHypredAppReminder() {
+        const now = new Date();
+        const daysSinceFriday = (now.getDay() - 5 + 7) % 7;
+        const occurrence = new Date(now.getFullYear(), now.getMonth(), now.getDate() - daysSinceFriday);
+        occurrence.setHours(14, 30, 0, 0);
+        if (occurrence > now) occurrence.setDate(occurrence.getDate() - 7);
+
+        const occurrenceDate = localDateKey(occurrence);
+        if (localStorage.getItem(hypredReminderCompletionStorageKey) === occurrenceDate) return;
+        if (
+          activeNotification?.type === "hypred-reminder" &&
+          activeNotification.occurrenceDate === occurrenceDate
+        ) {
+          return;
+        }
+        if (notificationQueue.some((notification) =>
+          notification.type === "hypred-reminder" && notification.occurrenceDate === occurrenceDate
+        )) {
+          return;
+        }
+        pop("Hypred app", [], "hypred-reminder", occurrenceDate);
+      }
+
       function setCategoryFilter(category) {
         activeCategory = category;
         resetTicketList();
@@ -2234,6 +2303,9 @@
       }
 
       function renderCalendarEvent(event) {
+        if (event.type === "special") {
+          return '<div class="calendar-event calendar-event-special">2:30 PM - Hypred app</div>';
+        }
         const isClosed = event.type === "closed";
         const ticketNumber = escapeHtml(String(event.ticket.ticketNumber || "Ticket"));
         if (isClosed) {
@@ -2270,6 +2342,10 @@
         const weekEvents = getCalendarEvents().filter(
           (event) => event.date >= weekStart && event.date < weekEnd
         );
+        const friday = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + 4);
+        friday.setHours(14, 30, 0, 0);
+        weekEvents.push({ date: friday, type: "special" });
+        weekEvents.sort((left, right) => left.date - right.date);
         const eventsByDate = new Map();
         weekEvents.forEach((event) => {
           const key = localDateKey(event.date);
@@ -2314,7 +2390,9 @@
       function renderUnscheduledTickets() {
         const availableTickets = tickets
           .map((ticket, index) => ({ ticket, index }))
-          .filter(({ ticket }) => !ticket.ticketReminderAt && !isTicketLocked(ticket));
+          .filter(({ ticket }) =>
+            ticket.status !== "Resolved" && !ticket.ticketReminderAt && !isTicketLocked(ticket)
+          );
         document.getElementById("unscheduled-ticket-count").textContent = String(availableTickets.length);
         document.getElementById("unscheduled-ticket-list").innerHTML = availableTickets.length
           ? availableTickets.map(({ ticket, index }) => `
@@ -2734,10 +2812,12 @@
       checkResolvedTickets();
       setInterval(checkResolvedTickets, 60 * 1000);
       checkTicketReminders();
+      checkHypredAppReminder();
       setInterval(() => {
         checkTicketReminders();
         updateReminderCountdowns();
       }, 1000);
+      setInterval(checkHypredAppReminder, 30 * 1000);
       setTheme(activeTheme);
       document.body.classList.toggle("color-blind-mode", colorBlindMode);
       document.getElementById("color-blind-toggle").textContent =

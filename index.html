@@ -649,7 +649,7 @@
 
       .calendar-day-events {
         position: relative;
-        height: 840px;
+        height: 960px;
         background-image: repeating-linear-gradient(
           to bottom,
           transparent 0,
@@ -665,7 +665,7 @@
 
       .calendar-time-scale {
         position: relative;
-        height: 840px;
+        height: 960px;
         color: #788493;
         font-size: 0.7rem;
         text-align: right;
@@ -1309,6 +1309,9 @@
       const defaultTicketLink = "https://hicclicc-smartit.ca.onbmc.com/smartit/app/#/ticket-consoleStudio";
       const resolvedClosureInterval = 5 * 24 * 60 * 60 * 1000;
       const defaultReminderDurationMinutes = 30;
+      const calendarDisplayStartHour = 7;
+      const calendarDisplayEndHour = 15;
+      const calendarPixelsPerMinute = 2;
       const hypredReminderCompletionStorageKey = "ticket_dashboard_hypred_completed_date";
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
@@ -2397,7 +2400,7 @@
 
       function layoutCalendarEvents(events) {
         const intervals = events.map((event) => {
-          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - 8 * 60;
+          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - calendarDisplayStartHour * 60;
           const durationMinutes = event.type === "closed"
             ? 1
             : event.type === "special"
@@ -2407,7 +2410,9 @@
             ...event,
             startMinute,
             endMinute: startMinute + durationMinutes,
-            height: event.type === "closed" ? 28 : Math.max(durationMinutes * 2, 28),
+            height: event.type === "closed"
+              ? 28
+              : Math.max(durationMinutes * calendarPixelsPerMinute, 28),
           };
         }).sort((left, right) => left.startMinute - right.startMinute || left.endMinute - right.endMinute);
 
@@ -2428,7 +2433,7 @@
           assignments.forEach((event) => {
             positionedEvents.push({
               ...event,
-              top: event.startMinute * 2,
+              top: event.startMinute * calendarPixelsPerMinute,
               leftPercent: event.lane * 100 / laneCount,
               widthPercent: 100 / laneCount,
             });
@@ -2477,8 +2482,9 @@
         const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
-        const timeScale = Array.from({ length: 15 }, (_, halfHour) => {
-          const totalMinutes = 8 * 60 + halfHour * 30;
+        const halfHourSlots = (calendarDisplayEndHour - calendarDisplayStartHour) * 2;
+        const timeScale = Array.from({ length: halfHourSlots + 1 }, (_, halfHour) => {
+          const totalMinutes = calendarDisplayStartHour * 60 + halfHour * 30;
           const hour = Math.floor(totalMinutes / 60);
           const minute = totalMinutes % 60;
           const label = `${hour % 12 || 12}${minute ? ":30" : ""} ${hour < 12 ? "AM" : "PM"}`;
@@ -2490,11 +2496,17 @@
           const dayEvents = eventsByDate.get(dayKey) || [];
           const closedOutsideHours = dayEvents
             .filter((event) => event.type === "closed")
-            .filter((event) => event.date.getHours() < 8 || event.date.getHours() >= 15)
+            .filter((event) =>
+              event.date.getHours() < calendarDisplayStartHour ||
+              event.date.getHours() >= calendarDisplayEndHour
+            )
             .map(renderCalendarEvent)
             .join("");
           const timedEvents = dayEvents.filter((event) =>
-            event.type !== "closed" || (event.date.getHours() >= 8 && event.date.getHours() < 15)
+            event.type !== "closed" || (
+              event.date.getHours() >= calendarDisplayStartHour &&
+              event.date.getHours() < calendarDisplayEndHour
+            )
           );
           const scheduledEvents = layoutCalendarEvents(timedEvents).map(renderCalendarEvent).join("");
           const dayClass = `calendar-day${dayKey === localDateKey(new Date()) ? " calendar-day-today" : ""}`;

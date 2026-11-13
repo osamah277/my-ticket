@@ -809,6 +809,14 @@
         cursor: pointer;
       }
 
+      .unscheduled-ticket[draggable="true"] {
+        cursor: grab;
+      }
+
+      .unscheduled-ticket[draggable="true"]:active {
+        cursor: grabbing;
+      }
+
       .unscheduled-ticket:hover {
         border-color: #4a90e2;
       }
@@ -1311,7 +1319,7 @@
         <div class="calendar-header">
           <h2 id="calendar-title">Reminder Calendar</h2>
         </div>
-        <p>Weekdays only. Reminder start times are 7:35 AM-3:29 PM.</p>
+        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. Reminders must start on weekdays from 7:35 AM-3:29 PM.</p>
         <div class="calendar-toolbar">
           <h3 id="calendar-period-label"></h3>
           <div class="calendar-navigation">
@@ -2452,19 +2460,21 @@
 
       function startCalendarReminderDrag(event, ticketIndex) {
         const ticket = tickets[ticketIndex];
-        if (!ticket || !ticket.ticketReminderAt || isTicketLocked(ticket)) {
+        if (!ticket || isTicketLocked(ticket)) {
           event.preventDefault();
           return;
         }
         draggedCalendarReminderIndex = ticketIndex;
-        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.effectAllowed = ticket.ticketReminderAt ? "move" : "copy";
         event.dataTransfer.setData("text/plain", ticket.ticketNumber);
       }
 
       function dragOverCalendarDay(event) {
         if (draggedCalendarReminderIndex < 0) return;
         event.preventDefault();
-        event.dataTransfer.dropEffect = "move";
+        event.dataTransfer.dropEffect = tickets[draggedCalendarReminderIndex]?.ticketReminderAt
+          ? "move"
+          : "copy";
         event.currentTarget.classList.add("calendar-drop-target");
       }
 
@@ -2480,9 +2490,13 @@
         const bounds = target.getBoundingClientRect();
         const pointerOffset = Math.max(0, Math.min(bounds.height, event.clientY - bounds.top));
         const minuteOffset = Math.round(pointerOffset / calendarPixelsPerMinute);
-        const reminderMinute = calendarDisplayStartMinute + minuteOffset;
+        const reminderMinute = Math.max(
+          7 * 60 + 35,
+          Math.min(15 * 60 + 29, calendarDisplayStartMinute + minuteOffset)
+        );
         date.setHours(Math.floor(reminderMinute / 60), reminderMinute % 60, 0, 0);
 
+        const wasScheduled = Boolean(ticket.ticketReminderAt);
         const error = saveTicketReminder(
           ticketIndex,
           toLocalDateTimeValue(date),
@@ -2493,7 +2507,11 @@
           return;
         }
         render();
-        pop(`Reminder moved for ticket ${ticket.ticketNumber}`, [ticket], "ticket-reminder");
+        pop(
+          `Reminder ${wasScheduled ? "moved" : "set"} for ticket ${ticket.ticketNumber}`,
+          [ticket],
+          "ticket-reminder"
+        );
       }
 
       function endCalendarReminderDrag() {
@@ -2678,7 +2696,14 @@
         document.getElementById("unscheduled-ticket-count").textContent = String(availableTickets.length);
         document.getElementById("unscheduled-ticket-list").innerHTML = availableTickets.length
           ? availableTickets.map(({ ticket, index }) => `
-            <button class="unscheduled-ticket" type="button" onclick="openReminderEditor(${index})">
+            <button
+              class="unscheduled-ticket"
+              type="button"
+              draggable="true"
+              ondragstart="startCalendarReminderDrag(event, ${index})"
+              ondragend="endCalendarReminderDrag()"
+              onclick="openReminderEditor(${index})"
+            >
               <strong>${escapeHtml(String(ticket.ticketNumber || "Ticket"))}</strong>
               ${ticket.shortDescription ? ` - ${escapeHtml(String(ticket.shortDescription))}` : ""}
             </button>

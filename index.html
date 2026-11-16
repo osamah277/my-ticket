@@ -85,17 +85,6 @@
         border-top: 1px solid #d3dce6;
       }
 
-      .osamah-lunch-setting {
-        margin-top: 8px;
-        padding: 8px;
-        border-top: 1px solid #d3dce6;
-      }
-
-      .osamah-lunch-setting p {
-        margin: 4px 0 0;
-        font-size: 0.8rem;
-      }
-
       .settings-danger-zone p {
         margin: 4px 0 8px;
         font-size: 0.8rem;
@@ -808,6 +797,11 @@
         background: #dce8ff;
       }
 
+      .calendar-event-note-reminder {
+        color: #3d3471;
+        background: #e8e2ff;
+      }
+
       .dark-mode .calendar-event-special {
         color: #f5e7be;
         background: #5b4923;
@@ -1160,9 +1154,6 @@
             <button type="button" data-profile="steven" aria-pressed="true" onclick="setProfile('steven')">
               Steven Settings (Default)
             </button>
-            <section class="osamah-lunch-setting" id="osamah-lunch-setting" aria-label="Osamah lunch time" hidden>
-              <p>Click a lunch block to choose that weekday's time, or drag it to move. Each weekday is set separately.</p>
-            </section>
             <section class="settings-danger-zone" aria-label="Ticket deletion">
               <label for="delete-ticket-number">Ticket number to delete</label>
               <input id="delete-ticket-number" type="text" placeholder="Enter ticket number">
@@ -1358,10 +1349,11 @@
         <div class="calendar-header">
           <h2 id="calendar-title">Reminder Calendar</h2>
         </div>
-        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. With Osamah Settings, click a lunch block to choose that weekday's time, or drag it to move. Reminders must start on weekdays from 7:35 AM-3:29 PM.</p>
+        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. Reminders must start on weekdays from 7:35 AM-3:29 PM.</p>
         <div class="calendar-toolbar">
           <h3 id="calendar-period-label"></h3>
           <div class="calendar-navigation">
+            <button class="btn" type="button" onclick="openNoteReminderEditor()">Add Note Reminder</button>
             <button class="search-clear" type="button" onclick="changeCalendarWeek(-1)">Previous Week</button>
             <button class="search-clear" type="button" onclick="goToCurrentWeek()">This Week</button>
             <button class="search-clear" type="button" onclick="changeCalendarWeek(1)">Next Week</button>
@@ -1380,9 +1372,13 @@
           <button class="search-dialog-close" type="button" aria-label="Close reminder editor" onclick="closeReminderEditor()">&#215;</button>
         </div>
         <p id="calendar-reminder-ticket"></p>
+        <div id="calendar-note-reminder-fields" hidden>
+          <label for="calendar-reminder-note">Note</label>
+          <textarea id="calendar-reminder-note" rows="3" maxlength="500"></textarea>
+        </div>
         <label for="calendar-reminder-time">Reminder date and time</label>
         <input id="calendar-reminder-time" type="datetime-local" step="60">
-        <label for="calendar-reminder-duration">Task duration (minutes)</label>
+        <label for="calendar-reminder-duration">Duration (minutes)</label>
         <input id="calendar-reminder-duration" type="number" min="1" step="1" value="30">
         <p>Schedule Monday-Friday, with a start time from 7:35 AM through 3:29 PM.</p>
         <p class="delete-confirm-error" id="calendar-reminder-error" role="alert"></p>
@@ -1416,6 +1412,7 @@
     <script>
       localStorage.removeItem("ticket_dashboard_delete_password");
       const storageKey = "tickets_v4";
+      const noteReminderStorageKey = "ticket_dashboard_note_reminders";
       const profileStorageKey = "ticket_dashboard_profile";
       const osamahLunchTimeStorageKey = "ticket_dashboard_osamah_lunch_time";
       const themeStorageKey = "ticket_dashboard_theme";
@@ -1454,6 +1451,7 @@
       let activePage = "tickets";
       let calendarDate = new Date();
       let draggedCalendarReminderIndex = -1;
+      let draggedCalendarNoteReminderIndex = -1;
       let draggedCalendarLunch = false;
       let draggedCalendarLunchWeekday = -1;
       let editingOsamahLunchWeekday = -1;
@@ -1506,6 +1504,7 @@
           }
           return cleanedTicket;
         });
+      let noteReminders = JSON.parse(localStorage.getItem(noteReminderStorageKey) || "[]");
 
       if (needsTicketMigrationSave) save();
 
@@ -1525,6 +1524,10 @@
 
       function save() {
         localStorage.setItem(storageKey, JSON.stringify(tickets));
+      }
+
+      function saveNoteReminders() {
+        localStorage.setItem(noteReminderStorageKey, JSON.stringify(noteReminders));
       }
 
       function parseCsv(text) {
@@ -2385,8 +2388,28 @@
           return "Schedule Monday-Friday with a start time from 7:35 AM through 3:29 PM";
         }
 
+        const conflict = findReminderConflict(
+          reminderTime,
+          reminderEnd,
+          index,
+          ""
+        );
+        if (conflict) {
+          if (conflict.type === "ticket") {
+            return `This time overlaps the reminder for ticket ${conflict.value.ticketNumber}`;
+          }
+          return `This time overlaps the note reminder "${conflict.value.note}"`;
+        }
+
+        ticket.ticketReminderAt = new Date(reminderTime).toISOString();
+        ticket.ticketReminderDurationMinutes = durationMinutes;
+        save();
+        return "";
+      }
+
+      function findReminderConflict(reminderTime, reminderEnd, excludedTicketIndex, excludedNoteReminderId) {
         const conflictingTicket = tickets.find((otherTicket, otherIndex) => {
-          if (otherIndex === index || !otherTicket.ticketReminderAt) return false;
+          if (otherIndex === excludedTicketIndex || !otherTicket.ticketReminderAt) return false;
           const otherStart = Date.parse(otherTicket.ticketReminderAt);
           const otherDuration = Number.isSafeInteger(otherTicket.ticketReminderDurationMinutes)
             ? otherTicket.ticketReminderDurationMinutes
@@ -2394,14 +2417,71 @@
           const otherEnd = otherStart + otherDuration * 60 * 1000;
           return reminderTime < otherEnd && reminderEnd > otherStart;
         });
-        if (conflictingTicket) {
-          return `This time overlaps the reminder for ticket ${conflictingTicket.ticketNumber}`;
+        if (conflictingTicket) return { type: "ticket", value: conflictingTicket };
+
+        const conflictingNote = noteReminders.find((noteReminder) => {
+          if (noteReminder.id === excludedNoteReminderId) return false;
+          const otherStart = Date.parse(noteReminder.reminderAt);
+          const otherDuration = Number.isSafeInteger(noteReminder.durationMinutes)
+            ? noteReminder.durationMinutes
+            : defaultReminderDurationMinutes;
+          const otherEnd = otherStart + otherDuration * 60 * 1000;
+          return reminderTime < otherEnd && reminderEnd > otherStart;
+        });
+        return conflictingNote ? { type: "note", value: conflictingNote } : null;
+      }
+
+      function saveNoteReminder(noteReminderId, noteValue, dateTimeValue, durationValue) {
+        const note = noteValue.trim();
+        if (!note) return "Enter a note for this reminder";
+
+        const reminderTime = Date.parse(dateTimeValue);
+        if (!dateTimeValue || !Number.isFinite(reminderTime) || reminderTime <= Date.now()) {
+          return "Choose a reminder time in the future";
         }
 
-        ticket.ticketReminderAt = new Date(reminderTime).toISOString();
-        ticket.ticketReminderDurationMinutes = durationMinutes;
-        save();
+        const durationMinutes = Number(durationValue);
+        if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1) {
+          return "Duration must be a positive whole number of minutes";
+        }
+
+        const reminderEnd = reminderTime + durationMinutes * 60 * 1000;
+        if (!Number.isFinite(reminderEnd) || Number.isNaN(new Date(reminderEnd).getTime())) {
+          return "Duration is too long for the selected reminder time";
+        }
+        if (!isWithinSchedulingHours(reminderTime)) {
+          return "Schedule Monday-Friday with a start time from 7:35 AM through 3:29 PM";
+        }
+
+        const conflict = findReminderConflict(reminderTime, reminderEnd, -1, noteReminderId);
+        if (conflict) {
+          if (conflict.type === "ticket") {
+            return `This time overlaps the reminder for ticket ${conflict.value.ticketNumber}`;
+          }
+          return `This time overlaps the note reminder "${conflict.value.note}"`;
+        }
+
+        const existingReminder = noteReminders.find((reminder) => reminder.id === noteReminderId);
+        if (existingReminder) {
+          existingReminder.note = note;
+          existingReminder.reminderAt = new Date(reminderTime).toISOString();
+          existingReminder.durationMinutes = durationMinutes;
+        } else {
+          noteReminders.push({
+            id: `note-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+            note,
+            reminderAt: new Date(reminderTime).toISOString(),
+            durationMinutes,
+          });
+        }
+        saveNoteReminders();
         return "";
+      }
+
+      function deleteNoteReminder(noteReminderId) {
+        noteReminders = noteReminders.filter((reminder) => reminder.id !== noteReminderId);
+        saveNoteReminders();
+        render();
       }
 
       function isWithinSchedulingHours(reminderTime) {
@@ -2440,6 +2520,7 @@
       function checkTicketReminders() {
         const now = Date.now();
         const dueTickets = [];
+        const dueNoteReminders = [];
 
         tickets.forEach((ticket) => {
           if (!ticket.ticketReminderAt || Date.parse(ticket.ticketReminderAt) > now) return;
@@ -2447,12 +2528,22 @@
           delete ticket.ticketReminderAt;
           delete ticket.ticketReminderDurationMinutes;
         });
+        noteReminders = noteReminders.filter((noteReminder) => {
+          if (Date.parse(noteReminder.reminderAt) > now) return true;
+          dueNoteReminders.push(noteReminder);
+          return false;
+        });
 
         if (dueTickets.length) {
           save();
           render();
           const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
           pop(`Reminder: ${ticketNumbers}`, dueTickets, "ticket-reminder");
+        }
+        if (dueNoteReminders.length) {
+          saveNoteReminders();
+          render();
+          pop(`Reminder: ${dueNoteReminders.map((reminder) => reminder.note).join("; ")}`);
         }
       }
 
@@ -2526,6 +2617,16 @@
             }
           }
         });
+        noteReminders.forEach((noteReminder) => {
+          const reminderTime = Date.parse(noteReminder.reminderAt);
+          if (Number.isFinite(reminderTime)) {
+            events.push({
+              noteReminder,
+              date: new Date(reminderTime),
+              type: "note-reminder",
+            });
+          }
+        });
         return events.sort((left, right) => left.date - right.date);
       }
 
@@ -2564,6 +2665,24 @@
             </button>
           `;
         }
+        if (event.type === "note-reminder") {
+          const label = `Note: ${event.noteReminder.note}`;
+          const noteReminderIndex = noteReminders.indexOf(event.noteReminder);
+          return `
+            <button
+              class="calendar-event calendar-event-note-reminder"
+              type="button"
+              draggable="true"
+              ondragstart="startCalendarNoteReminderDrag(event, ${noteReminderIndex})"
+              ondragend="endCalendarReminderDrag()"
+              onclick="openNoteReminderEditor(${noteReminderIndex})"
+              style="top: ${event.top}px; left: calc(${event.leftPercent}% + 2px); width: calc(${event.widthPercent}% - 4px); height: ${event.height}px;"
+              title="${escapeAttribute(label)}"
+            >
+              ${escapeHtml(label)}
+            </button>
+          `;
+        }
         const isSpecial = event.type === "special";
         const isCompletedTicket = !isSpecial && isClosedCategoryStatus(event.ticket.status);
         const eventLabel = isSpecial
@@ -2593,13 +2712,23 @@
           return;
         }
         draggedCalendarLunch = false;
+        draggedCalendarNoteReminderIndex = -1;
         draggedCalendarReminderIndex = ticketIndex;
         event.dataTransfer.effectAllowed = ticket.ticketReminderAt ? "move" : "copy";
         event.dataTransfer.setData("text/plain", ticket.ticketNumber);
       }
 
+      function startCalendarNoteReminderDrag(event, noteReminderIndex) {
+        draggedCalendarReminderIndex = -1;
+        draggedCalendarNoteReminderIndex = noteReminderIndex;
+        draggedCalendarLunch = false;
+        event.dataTransfer.effectAllowed = "move";
+        event.dataTransfer.setData("text/plain", "note-reminder");
+      }
+
       function startCalendarLunchDrag(event, weekdayIndex) {
         draggedCalendarReminderIndex = -1;
+        draggedCalendarNoteReminderIndex = -1;
         draggedCalendarLunch = true;
         draggedCalendarLunchWeekday = weekdayIndex;
         event.dataTransfer.effectAllowed = "move";
@@ -2607,20 +2736,22 @@
       }
 
       function dragOverCalendarDay(event) {
-        if (draggedCalendarReminderIndex < 0 && !draggedCalendarLunch) return;
+        if (draggedCalendarReminderIndex < 0 && draggedCalendarNoteReminderIndex < 0 && !draggedCalendarLunch) return;
         if (draggedCalendarLunch) {
           const targetDate = new Date(`${event.currentTarget.dataset.calendarDate}T00:00:00`);
           if ((targetDate.getDay() + 6) % 7 !== draggedCalendarLunchWeekday) return;
         }
         event.preventDefault();
-        event.dataTransfer.dropEffect = draggedCalendarLunch || tickets[draggedCalendarReminderIndex]?.ticketReminderAt
+        event.dataTransfer.dropEffect = draggedCalendarLunch ||
+          draggedCalendarNoteReminderIndex >= 0 ||
+          tickets[draggedCalendarReminderIndex]?.ticketReminderAt
           ? "move"
           : "copy";
         event.currentTarget.classList.add("calendar-drop-target");
       }
 
       function dropCalendarReminder(event) {
-        if (draggedCalendarReminderIndex < 0 && !draggedCalendarLunch) return;
+        if (draggedCalendarReminderIndex < 0 && draggedCalendarNoteReminderIndex < 0 && !draggedCalendarLunch) return;
         if (draggedCalendarLunch) {
           const targetDate = new Date(`${event.currentTarget.dataset.calendarDate}T00:00:00`);
           if ((targetDate.getDay() + 6) % 7 !== draggedCalendarLunchWeekday) return;
@@ -2643,6 +2774,29 @@
             `${osamahLunchTimeStorageKey}_${draggedCalendarLunchWeekday}`,
             lunchTime
           );
+          endCalendarReminderDrag();
+          renderCalendar();
+          return;
+        }
+
+        if (draggedCalendarNoteReminderIndex >= 0) {
+          const noteReminder = noteReminders[draggedCalendarNoteReminderIndex];
+          if (!noteReminder) return;
+          const reminderMinute = Math.max(
+            7 * 60 + 35,
+            Math.min(15 * 60 + 29, calendarDisplayStartMinute + minuteOffset)
+          );
+          date.setHours(Math.floor(reminderMinute / 60), reminderMinute % 60, 0, 0);
+          const error = saveNoteReminder(
+            noteReminder.id,
+            noteReminder.note,
+            toLocalDateTimeValue(date),
+            noteReminder.durationMinutes || defaultReminderDurationMinutes
+          );
+          if (error) {
+            pop(error);
+            return;
+          }
           endCalendarReminderDrag();
           renderCalendar();
           return;
@@ -2676,6 +2830,7 @@
 
       function endCalendarReminderDrag() {
         draggedCalendarReminderIndex = -1;
+        draggedCalendarNoteReminderIndex = -1;
         draggedCalendarLunch = false;
         draggedCalendarLunchWeekday = -1;
         document.querySelectorAll(".calendar-drop-target")
@@ -2692,7 +2847,9 @@
                 ? 60
                 : event.type === "special"
                   ? 30
-                  : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+                  : event.type === "note-reminder"
+                    ? event.noteReminder.durationMinutes || defaultReminderDurationMinutes
+                    : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
           return {
             ...event,
             startMinute,
@@ -2889,14 +3046,19 @@
       }
 
       let editingReminderIndex = -1;
+      let editingNoteReminderId = "";
 
       function openReminderEditor(index) {
         const ticket = tickets[index];
         if (!ticket || isTicketLocked(ticket)) return;
         editingReminderIndex = index;
+        editingNoteReminderId = "";
+        document.getElementById("calendar-note-reminder-fields").hidden = true;
+        document.getElementById("calendar-reminder-ticket").hidden = false;
         const hasReminder = Boolean(ticket.ticketReminderAt);
         document.getElementById("calendar-reminder-title").textContent =
           hasReminder ? "Edit Ticket Reminder" : "Schedule Ticket Reminder";
+        document.getElementById("calendar-reminder-cancel").textContent = "Cancel Reminder";
         document.getElementById("calendar-reminder-ticket").textContent =
           `Ticket ${ticket.ticketNumber}${ticket.shortDescription ? ` - ${ticket.shortDescription}` : ""}`;
         document.getElementById("calendar-reminder-time").value = hasReminder
@@ -2909,13 +3071,51 @@
         document.getElementById("calendar-reminder-dialog").showModal();
       }
 
+      function openNoteReminderEditor(noteReminderIndex = -1) {
+        const noteReminder = noteReminders[noteReminderIndex];
+        editingReminderIndex = -1;
+        editingNoteReminderId = noteReminder?.id || "";
+        document.getElementById("calendar-reminder-title").textContent =
+          noteReminder ? "Edit Note Reminder" : "Add Note Reminder";
+        document.getElementById("calendar-reminder-ticket").hidden = true;
+        document.getElementById("calendar-note-reminder-fields").hidden = false;
+        document.getElementById("calendar-reminder-note").value = noteReminder?.note || "";
+        document.getElementById("calendar-reminder-time").value = noteReminder
+          ? toLocalDateTimeValue(new Date(noteReminder.reminderAt))
+          : "";
+        document.getElementById("calendar-reminder-duration").value =
+          String(noteReminder?.durationMinutes || defaultReminderDurationMinutes);
+        document.getElementById("calendar-reminder-error").textContent = "";
+        const cancelButton = document.getElementById("calendar-reminder-cancel");
+        cancelButton.hidden = !noteReminder;
+        cancelButton.textContent = "Delete Reminder";
+        document.getElementById("calendar-reminder-dialog").showModal();
+      }
+
       function closeReminderEditor() {
         const dialog = document.getElementById("calendar-reminder-dialog");
         if (dialog.open) dialog.close();
         editingReminderIndex = -1;
+        editingNoteReminderId = "";
       }
 
       function saveReminderFromEditor() {
+        if (document.getElementById("calendar-note-reminder-fields").hidden === false) {
+          const error = saveNoteReminder(
+            editingNoteReminderId,
+            document.getElementById("calendar-reminder-note").value,
+            document.getElementById("calendar-reminder-time").value,
+            document.getElementById("calendar-reminder-duration").value
+          );
+          if (error) {
+            document.getElementById("calendar-reminder-error").textContent = error;
+            return;
+          }
+          closeReminderEditor();
+          render();
+          pop("Note reminder saved.");
+          return;
+        }
         if (editingReminderIndex < 0) return;
         const ticketIndex = editingReminderIndex;
         const ticket = tickets[ticketIndex];
@@ -2939,6 +3139,12 @@
       }
 
       function cancelReminderFromEditor() {
+        if (editingNoteReminderId) {
+          const noteReminderId = editingNoteReminderId;
+          closeReminderEditor();
+          deleteNoteReminder(noteReminderId);
+          return;
+        }
         if (editingReminderIndex < 0) return;
         cancelTicketReminder(editingReminderIndex);
         closeReminderEditor();
@@ -3149,8 +3355,6 @@
         document.querySelectorAll(".settings-panel [data-profile]").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.profile === activeProfile));
         });
-        document.getElementById("osamah-lunch-setting").hidden = activeProfile !== "osamah";
-
         document.querySelectorAll(".stat-filter").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));
         });

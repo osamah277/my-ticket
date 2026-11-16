@@ -91,16 +91,6 @@
         border-top: 1px solid #d3dce6;
       }
 
-      .osamah-lunch-setting label,
-      .osamah-lunch-setting input {
-        display: block;
-        width: 100%;
-      }
-
-      .osamah-lunch-setting input {
-        margin-top: 4px;
-      }
-
       .osamah-lunch-setting p {
         margin: 4px 0 0;
         font-size: 0.8rem;
@@ -1161,16 +1151,7 @@
               Steven Settings (Default)
             </button>
             <section class="osamah-lunch-setting" id="osamah-lunch-setting" aria-label="Osamah lunch time" hidden>
-              <label for="osamah-lunch-time">Lunch time (1 hour)</label>
-              <input
-                id="osamah-lunch-time"
-                type="time"
-                min="07:30"
-                max="14:30"
-                step="60"
-                onchange="setOsamahLunchTime(this)"
-              >
-              <p>Drag the lunch block on the calendar to move it.</p>
+              <p>Click a lunch block to choose that weekday's time, or drag it to move. Each weekday is set separately.</p>
             </section>
             <section class="settings-danger-zone" aria-label="Ticket deletion">
               <label for="delete-ticket-number">Ticket number to delete</label>
@@ -1367,7 +1348,7 @@
         <div class="calendar-header">
           <h2 id="calendar-title">Reminder Calendar</h2>
         </div>
-        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. With Osamah Settings, drag the one-hour lunch block to move it. Reminders must start on weekdays from 7:35 AM-3:29 PM.</p>
+        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. With Osamah Settings, click a lunch block to choose that weekday's time, or drag it to move. Reminders must start on weekdays from 7:35 AM-3:29 PM.</p>
         <div class="calendar-toolbar">
           <h3 id="calendar-period-label"></h3>
           <div class="calendar-navigation">
@@ -1404,6 +1385,22 @@
         </div>
       </dialog>
 
+      <dialog class="search-dialog" id="osamah-lunch-dialog" aria-labelledby="osamah-lunch-title">
+        <div class="search-dialog-header">
+          <h2 id="osamah-lunch-title">Set lunch time</h2>
+          <button class="search-dialog-close" type="button" aria-label="Close lunch time editor" onclick="closeOsamahLunchEditor()">&#215;</button>
+        </div>
+        <p id="osamah-lunch-day"></p>
+        <label for="osamah-lunch-time-input">Lunch starts at</label>
+        <input id="osamah-lunch-time-input" type="time" min="07:30" max="14:30" step="60">
+        <p>Lunch lasts one hour. This changes only the selected weekday.</p>
+        <p class="delete-confirm-error" id="osamah-lunch-error" role="alert"></p>
+        <div class="search-dialog-actions">
+          <button class="search-clear" type="button" onclick="closeOsamahLunchEditor()">Cancel</button>
+          <button class="btn" type="button" onclick="saveOsamahLunchTime()">Save time</button>
+        </div>
+      </dialog>
+
     </main>
 
     <script>
@@ -1421,6 +1418,7 @@
       const calendarDisplayStartMinute = 7 * 60 + 30;
       const calendarDisplayEndMinute = 15 * 60 + 30;
       const calendarPixelsPerMinute = 2;
+      const calendarWeekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
       const hypredReminderCompletionStorageKey = "ticket_dashboard_hypred_completed_date";
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
@@ -1447,6 +1445,8 @@
       let calendarDate = new Date();
       let draggedCalendarReminderIndex = -1;
       let draggedCalendarLunch = false;
+      let draggedCalendarLunchWeekday = -1;
+      let editingOsamahLunchWeekday = -1;
       let draggedTicket = null;
       let pendingTicketDeletion = null;
       let needsTicketMigrationSave = false;
@@ -1879,32 +1879,52 @@
         render();
       }
 
-      function getOsamahLunchTime() {
-        const storedTime = localStorage.getItem(osamahLunchTimeStorageKey) || "12:00";
-        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(storedTime);
-        if (!match) return "12:00";
+      function isValidOsamahLunchTime(time) {
+        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(time);
+        if (!match) return false;
         const minuteOfDay = Number(match[1]) * 60 + Number(match[2]);
         return minuteOfDay >= calendarDisplayStartMinute &&
-          minuteOfDay <= calendarDisplayEndMinute - 60
-          ? storedTime
-          : "12:00";
+          minuteOfDay <= calendarDisplayEndMinute - 60;
       }
 
-      function setOsamahLunchTime(input) {
-        const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(input.value);
-        const minuteOfDay = match ? Number(match[1]) * 60 + Number(match[2]) : -1;
-        if (
-          minuteOfDay < calendarDisplayStartMinute ||
-          minuteOfDay > calendarDisplayEndMinute - 60
-        ) {
-          input.value = getOsamahLunchTime();
-          input.setCustomValidity("Choose a lunch start time between 7:30 AM and 2:30 PM.");
-          input.reportValidity();
+      function getOsamahLunchTime(weekdayIndex) {
+        const daySpecificTime = localStorage.getItem(`${osamahLunchTimeStorageKey}_${weekdayIndex}`);
+        const storedTime = daySpecificTime || localStorage.getItem(osamahLunchTimeStorageKey) || "12:00";
+        return isValidOsamahLunchTime(storedTime) ? storedTime : "12:00";
+      }
+
+      function openOsamahLunchEditor(weekdayIndex) {
+        if (weekdayIndex < 0 || weekdayIndex >= calendarWeekdays.length) return;
+        editingOsamahLunchWeekday = weekdayIndex;
+        document.getElementById("osamah-lunch-day").textContent =
+          `This changes lunch time for ${calendarWeekdays[weekdayIndex]} only.`;
+        document.getElementById("osamah-lunch-time-input").value =
+          getOsamahLunchTime(weekdayIndex);
+        document.getElementById("osamah-lunch-error").textContent = "";
+        document.getElementById("osamah-lunch-dialog").showModal();
+        document.getElementById("osamah-lunch-time-input").focus();
+      }
+
+      function closeOsamahLunchEditor() {
+        const dialog = document.getElementById("osamah-lunch-dialog");
+        if (dialog.open) dialog.close();
+        editingOsamahLunchWeekday = -1;
+      }
+
+      function saveOsamahLunchTime() {
+        if (editingOsamahLunchWeekday < 0) return;
+        const input = document.getElementById("osamah-lunch-time-input");
+        if (!isValidOsamahLunchTime(input.value)) {
+          document.getElementById("osamah-lunch-error").textContent =
+            "Choose a lunch start time between 7:30 AM and 2:30 PM.";
           return;
         }
-        input.setCustomValidity("");
-        localStorage.setItem(osamahLunchTimeStorageKey, input.value);
-        if (activePage === "calendar") renderCalendar();
+        localStorage.setItem(
+          `${osamahLunchTimeStorageKey}_${editingOsamahLunchWeekday}`,
+          input.value
+        );
+        closeOsamahLunchEditor();
+        renderCalendar();
       }
 
       function pop(message, linkedTickets = [], type = "default", occurrenceDate = "") {
@@ -2523,11 +2543,12 @@
               class="calendar-event calendar-event-lunch"
               type="button"
               draggable="true"
-              ondragstart="startCalendarLunchDrag(event)"
+              onclick="openOsamahLunchEditor(${event.weekday})"
+              ondragstart="startCalendarLunchDrag(event, ${event.weekday})"
               ondragend="endCalendarReminderDrag()"
               style="top: ${event.top}px; left: calc(${event.leftPercent}% + 2px); width: calc(${event.widthPercent}% - 4px); height: ${event.height}px;"
               title="${escapeAttribute(label)}"
-              aria-label="${escapeAttribute(label)}; drag to move"
+              aria-label="${escapeAttribute(label)}; click to choose time or drag to move"
             >
               ${escapeHtml(label)}
             </button>
@@ -2566,15 +2587,20 @@
         event.dataTransfer.setData("text/plain", ticket.ticketNumber);
       }
 
-      function startCalendarLunchDrag(event) {
+      function startCalendarLunchDrag(event, weekdayIndex) {
         draggedCalendarReminderIndex = -1;
         draggedCalendarLunch = true;
+        draggedCalendarLunchWeekday = weekdayIndex;
         event.dataTransfer.effectAllowed = "move";
         event.dataTransfer.setData("text/plain", "lunch");
       }
 
       function dragOverCalendarDay(event) {
         if (draggedCalendarReminderIndex < 0 && !draggedCalendarLunch) return;
+        if (draggedCalendarLunch) {
+          const targetDate = new Date(`${event.currentTarget.dataset.calendarDate}T00:00:00`);
+          if ((targetDate.getDay() + 6) % 7 !== draggedCalendarLunchWeekday) return;
+        }
         event.preventDefault();
         event.dataTransfer.dropEffect = draggedCalendarLunch || tickets[draggedCalendarReminderIndex]?.ticketReminderAt
           ? "move"
@@ -2584,6 +2610,10 @@
 
       function dropCalendarReminder(event) {
         if (draggedCalendarReminderIndex < 0 && !draggedCalendarLunch) return;
+        if (draggedCalendarLunch) {
+          const targetDate = new Date(`${event.currentTarget.dataset.calendarDate}T00:00:00`);
+          if ((targetDate.getDay() + 6) % 7 !== draggedCalendarLunchWeekday) return;
+        }
         event.preventDefault();
         const target = event.currentTarget;
         target.classList.remove("calendar-drop-target");
@@ -2598,7 +2628,10 @@
             Math.min(calendarDisplayEndMinute - 60, calendarDisplayStartMinute + minuteOffset)
           );
           const lunchTime = `${String(Math.floor(lunchMinute / 60)).padStart(2, "0")}:${String(lunchMinute % 60).padStart(2, "0")}`;
-          localStorage.setItem(osamahLunchTimeStorageKey, lunchTime);
+          localStorage.setItem(
+            `${osamahLunchTimeStorageKey}_${draggedCalendarLunchWeekday}`,
+            lunchTime
+          );
           endCalendarReminderDrag();
           renderCalendar();
           return;
@@ -2633,6 +2666,7 @@
       function endCalendarReminderDrag() {
         draggedCalendarReminderIndex = -1;
         draggedCalendarLunch = false;
+        draggedCalendarLunchWeekday = -1;
         document.querySelectorAll(".calendar-drop-target")
           .forEach((element) => element.classList.remove("calendar-drop-target"));
       }
@@ -2640,13 +2674,14 @@
       function layoutCalendarEvents(events) {
         const intervals = events.map((event) => {
           const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - calendarDisplayStartMinute;
-          const durationMinutes = event.type === "closed"
-            ? 1
-            : event.type === "lunch"
-              ? 60
-            : event.type === "special"
-              ? 30
-              : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
+          const durationMinutes =
+            event.type === "closed"
+              ? 1
+              : event.type === "lunch"
+                ? 60
+                : event.type === "special"
+                  ? 30
+                  : event.ticket.ticketReminderDurationMinutes || defaultReminderDurationMinutes;
           return {
             ...event,
             startMinute,
@@ -2713,15 +2748,15 @@
         friday.setHours(14, 30, 0, 0);
         weekEvents.push({ date: friday, type: "special" });
         if (activeProfile === "osamah") {
-          const [lunchHour, lunchMinute] = getOsamahLunchTime().split(":").map(Number);
           for (let dayOffset = 0; dayOffset < 5; dayOffset += 1) {
+            const [lunchHour, lunchMinute] = getOsamahLunchTime(dayOffset).split(":").map(Number);
             const lunchDate = new Date(
               weekStart.getFullYear(),
               weekStart.getMonth(),
               weekStart.getDate() + dayOffset
             );
             lunchDate.setHours(lunchHour, lunchMinute, 0, 0);
-            weekEvents.push({ date: lunchDate, type: "lunch" });
+            weekEvents.push({ date: lunchDate, type: "lunch", weekday: dayOffset });
           }
         }
         weekEvents.sort((left, right) => left.date - right.date);
@@ -2732,7 +2767,7 @@
           dayEvents.push(event);
           eventsByDate.set(key, dayEvents);
         });
-        const weekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"]
+        const weekdays = calendarWeekdays
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
         const halfHourSlots = (calendarDisplayEndMinute - calendarDisplayStartMinute) / 30;
@@ -3104,7 +3139,6 @@
           button.setAttribute("aria-pressed", String(button.dataset.profile === activeProfile));
         });
         document.getElementById("osamah-lunch-setting").hidden = activeProfile !== "osamah";
-        document.getElementById("osamah-lunch-time").value = getOsamahLunchTime();
 
         document.querySelectorAll(".stat-filter").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.dataset.category === activeCategory));

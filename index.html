@@ -794,13 +794,18 @@
       }
 
       .calendar-event-lunch {
-        color: #174b2d;
-        background: #c9ead2;
+        color: #374151;
+        background: #e5e7eb;
         cursor: grab !important;
       }
 
       .calendar-event-lunch:active {
         cursor: grabbing !important;
+      }
+
+      .calendar-event-completed {
+        color: #243b65;
+        background: #dce8ff;
       }
 
       .dark-mode .calendar-event-special {
@@ -810,7 +815,12 @@
 
       .dark-mode .calendar-event-lunch {
         color: #e5e7eb;
-        background: #24543a;
+        background: #4b5563;
+      }
+
+      .dark-mode .calendar-event-completed {
+        color: #e5e7eb;
+        background: #35465c;
       }
 
       .calendar-unscheduled {
@@ -2555,10 +2565,11 @@
           `;
         }
         const isSpecial = event.type === "special";
+        const isCompletedTicket = !isSpecial && isClosedCategoryStatus(event.ticket.status);
         const eventLabel = isSpecial
           ? "Hypred app"
           : escapeHtml(String(event.ticket.ticketNumber || "Ticket"));
-        const className = `calendar-event${isSpecial ? " calendar-event-special" : ""}`;
+        const className = `calendar-event${isSpecial ? " calendar-event-special" : ""}${isCompletedTicket ? " calendar-event-completed" : ""}`;
         return `
           <button
             class="${className}"

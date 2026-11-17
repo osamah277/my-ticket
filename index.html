@@ -1062,9 +1062,217 @@
         cursor: pointer;
       }
 
+      .overview {
+        display: grid;
+        gap: 16px;
+      }
+
+      .overview[hidden] {
+        display: none;
+      }
+
+      .overview-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .overview-heading h2,
+      .overview-heading p {
+        margin: 0;
+      }
+
+      .overview-heading p {
+        margin-top: 4px;
+        color: #667085;
+      }
+
+      .overview-stats {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .overview-stat {
+        min-height: 112px;
+        padding: 18px;
+        border: 1px solid #d3dce6;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .overview-stat-label {
+        color: #667085;
+        font-size: 0.9rem;
+        font-weight: 600;
+      }
+
+      .overview-stat-value {
+        display: block;
+        margin-top: 8px;
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1;
+      }
+
+      .overview-panels {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 16px;
+      }
+
+      .overview-panel {
+        min-width: 0;
+        padding: 20px;
+        border: 1px solid #d3dce6;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .overview-panel h3 {
+        margin: 0 0 18px;
+      }
+
+      .overview-breakdown {
+        display: grid;
+        gap: 14px;
+      }
+
+      .overview-breakdown-item {
+        display: grid;
+        grid-template-columns: minmax(92px, 0.7fr) minmax(80px, 2fr) 32px;
+        align-items: center;
+        gap: 10px;
+        font-size: 0.9rem;
+      }
+
+      .overview-breakdown-count {
+        text-align: right;
+        font-weight: 600;
+      }
+
+      .overview-track {
+        height: 9px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: #edf1f6;
+      }
+
+      .overview-track span {
+        display: block;
+        height: 100%;
+        border-radius: inherit;
+        background: #4a90e2;
+      }
+
+      .overview-priority .overview-track span {
+        background: #4a90e2;
+      }
+
+      .overview-priority .overview-breakdown-item:first-child .overview-track span {
+        background: #d64545;
+      }
+
+      .overview-priority .overview-breakdown-item:last-child .overview-track span {
+        background: #16804a;
+      }
+
+      .overview-recent {
+        display: grid;
+      }
+
+      .overview-ticket {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
+        gap: 12px;
+        padding: 12px 0;
+        border-top: 1px solid #e8edf3;
+      }
+
+      .overview-ticket:first-child {
+        border-top: 0;
+      }
+
+      .overview-ticket-main {
+        min-width: 0;
+      }
+
+      .overview-ticket-title {
+        overflow: hidden;
+        font-weight: 700;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .overview-ticket-meta {
+        margin-top: 4px;
+        color: #667085;
+        font-size: 0.85rem;
+        overflow-wrap: anywhere;
+      }
+
+      .overview-ticket-status {
+        padding: 5px 9px;
+        border-radius: 999px;
+        background: #edf3fa;
+        font-size: 0.8rem;
+        font-weight: 600;
+        white-space: nowrap;
+      }
+
+      .overview-empty {
+        margin: 0;
+        color: #667085;
+      }
+
+      .dark-mode .overview-heading p,
+      .dark-mode .overview-stat-label,
+      .dark-mode .overview-ticket-meta,
+      .dark-mode .overview-empty {
+        color: #aab4c2;
+      }
+
+      .dark-mode .overview-stat,
+      .dark-mode .overview-panel {
+        color: #e5e7eb;
+        border-color: #3a4351;
+        background: #242b36;
+      }
+
+      .dark-mode .overview-track {
+        background: #3a4351;
+      }
+
+      .dark-mode .overview-ticket {
+        border-color: #3a4351;
+      }
+
+      .dark-mode .overview-ticket-status {
+        background: #35465c;
+      }
+
       @media (max-width: 600px) {
         body {
           margin: 12px;
+        }
+
+        .overview-heading {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .overview-stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .overview-panels {
+          grid-template-columns: 1fr;
+        }
+
+        .overview-panel {
+          padding: 16px;
         }
 
         .table th,
@@ -1181,7 +1389,10 @@
       </dialog>
 
       <nav class="page-navigation" aria-label="Dashboard pages">
-        <button class="page-tab" type="button" aria-pressed="true" onclick="setActivePage('tickets')">
+        <button class="page-tab" type="button" aria-pressed="true" onclick="setActivePage('overview')">
+          Overview
+        </button>
+        <button class="page-tab" type="button" aria-pressed="false" onclick="setActivePage('tickets')">
           Tickets
         </button>
         <button class="page-tab" type="button" aria-pressed="false" onclick="setActivePage('calendar')">
@@ -1189,7 +1400,49 @@
         </button>
       </nav>
 
-      <section id="ticket-page">
+      <section class="overview" id="overview-page" aria-labelledby="overview-title">
+        <div class="overview-heading">
+          <div>
+            <h2 id="overview-title">Overview</h2>
+            <p>Your ticket workload at a glance.</p>
+          </div>
+          <button class="btn" type="button" onclick="setActivePage('tickets')">Manage tickets</button>
+        </div>
+        <div class="overview-stats" aria-label="Ticket summary">
+          <article class="overview-stat">
+            <span class="overview-stat-label">Total tickets</span>
+            <strong class="overview-stat-value" id="overview-total">0</strong>
+          </article>
+          <article class="overview-stat">
+            <span class="overview-stat-label">Active tickets</span>
+            <strong class="overview-stat-value" id="overview-active">0</strong>
+          </article>
+          <article class="overview-stat">
+            <span class="overview-stat-label">Open high priority</span>
+            <strong class="overview-stat-value" id="overview-high">0</strong>
+          </article>
+          <article class="overview-stat">
+            <span class="overview-stat-label">Scheduled reminders</span>
+            <strong class="overview-stat-value" id="overview-reminders">0</strong>
+          </article>
+        </div>
+        <div class="overview-panels">
+          <section class="overview-panel" aria-labelledby="overview-status-title">
+            <h3 id="overview-status-title">Tickets by status</h3>
+            <div class="overview-breakdown" id="overview-status-breakdown"></div>
+          </section>
+          <section class="overview-panel overview-priority" aria-labelledby="overview-priority-title">
+            <h3 id="overview-priority-title">Tickets by priority</h3>
+            <div class="overview-breakdown" id="overview-priority-breakdown"></div>
+          </section>
+        </div>
+        <section class="overview-panel" aria-labelledby="overview-recent-title">
+          <h3 id="overview-recent-title">Recently updated</h3>
+          <div class="overview-recent" id="overview-recent"></div>
+        </section>
+      </section>
+
+      <section id="ticket-page" hidden>
       <div class="stats">
         <button type="button" class="stat stat-filter" data-category="All" aria-pressed="true" onclick="setCategoryFilter('All')">
           Total: <span id="t">0</span>
@@ -1448,7 +1701,7 @@
       let notificationQueue = [];
       let activeNotification = null;
       let previousFocus = null;
-      let activePage = "tickets";
+      let activePage = "overview";
       let calendarDate = new Date();
       let draggedCalendarReminderIndex = -1;
       let draggedCalendarNoteReminderIndex = -1;
@@ -2576,15 +2829,16 @@
       }
 
       function setActivePage(page) {
-        if (page !== "tickets" && page !== "calendar") return;
+        if (page !== "overview" && page !== "tickets" && page !== "calendar") return;
         activePage = page;
+        document.getElementById("overview-page").hidden = page !== "overview";
         document.getElementById("ticket-page").hidden = page !== "tickets";
         document.getElementById("calendar-page").hidden = page !== "calendar";
         document.querySelectorAll(".page-tab").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.textContent.trim().toLowerCase() === page));
         });
         if (page === "calendar") renderCalendar();
-        else updateTableWidth();
+        else if (page === "tickets") updateTableWidth();
       }
 
       function goToCurrentWeek() {
@@ -3350,6 +3604,7 @@
         const visibleTickets = getVisibleTickets();
         const isSorted = appliedTicketSearch.sort !== "";
 
+        renderDashboard();
         document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
         updateTableWidth();
         document.querySelectorAll(".settings-panel [data-profile]").forEach((button) => {
@@ -3491,6 +3746,75 @@
         document.getElementById("c").innerText =
           tickets.filter((ticket) => isClosedCategoryStatus(ticket.status)).length;
         if (activePage === "calendar") renderCalendar();
+      }
+
+      function renderDashboard() {
+        const statusCounts = [
+          ["Assigned", tickets.filter((ticket) => ticket.status === "Assigned").length],
+          ["In Progress", tickets.filter((ticket) => ticket.status === "In Progress").length],
+          ["Pending Customer", tickets.filter((ticket) => ticket.status === "Pending Customer").length],
+          ["Pending Vendor", tickets.filter((ticket) => ticket.status === "Pending Vendor").length],
+          ["Resolved", tickets.filter((ticket) => ticket.status === "Resolved").length],
+          ["Closed", tickets.filter((ticket) => ticket.status === "Closed").length],
+        ];
+        const priorityCounts = ["High", "Medium", "Low"].map((priority) => [
+          priority,
+          tickets.filter((ticket) => ticket.priority === priority).length,
+        ]);
+        const total = tickets.length;
+        const active = tickets.filter((ticket) => !isClosedCategoryStatus(ticket.status)).length;
+        const highPriority = tickets.filter((ticket) =>
+          ticket.priority === "High" && !isClosedCategoryStatus(ticket.status)
+        ).length;
+        const scheduledReminders = tickets.filter((ticket) => ticket.ticketReminderAt).length;
+
+        document.getElementById("overview-total").textContent = total;
+        document.getElementById("overview-active").textContent = active;
+        document.getElementById("overview-high").textContent = highPriority;
+        document.getElementById("overview-reminders").textContent = scheduledReminders;
+
+        const renderBreakdown = (elementId, counts) => {
+          document.getElementById(elementId).innerHTML = counts.map(([label, count]) => `
+            <div class="overview-breakdown-item">
+              <span>${escapeHtml(label)}</span>
+              <div
+                class="overview-track"
+                role="img"
+                aria-label="${escapeAttribute(label)}: ${count} of ${total} tickets"
+              ><span style="width: ${total ? (count / total) * 100 : 0}%"></span></div>
+              <span class="overview-breakdown-count">${count}</span>
+            </div>
+          `).join("");
+        };
+        renderBreakdown("overview-status-breakdown", statusCounts);
+        renderBreakdown("overview-priority-breakdown", priorityCounts);
+
+        const recentTickets = [...tickets]
+          .sort((left, right) => Date.parse(right.lastUpdateAt) - Date.parse(left.lastUpdateAt))
+          .slice(0, 5);
+        document.getElementById("overview-recent").innerHTML = recentTickets.length
+          ? recentTickets.map((ticket) => `
+            <article class="overview-ticket">
+              <div class="overview-ticket-main">
+                <div class="overview-ticket-title">
+                  ${escapeHtml(ticket.ticketNumber)}${ticket.customerName
+                    ? ` · ${escapeHtml(ticket.customerName)}`
+                    : ""}
+                </div>
+                <div class="overview-ticket-meta">
+                  ${escapeHtml(ticket.shortDescription || "No description")}
+                  · Updated ${escapeHtml(formatDate(ticket.lastUpdateAt, {
+                    month: "short",
+                    day: "numeric",
+                    hour: "numeric",
+                    minute: "2-digit",
+                  }))}
+                </div>
+              </div>
+              <span class="overview-ticket-status">${escapeHtml(ticket.status || "Unknown")}</span>
+            </article>
+          `).join("")
+          : '<p class="overview-empty">No tickets yet. Create a ticket to see your activity here.</p>';
       }
 
       function toLocalDateTimeValue(date) {

@@ -1737,6 +1737,11 @@
             delete cleanedTicket.resolvedAt;
             needsTicketMigrationSave = true;
           }
+          if (isClosedCategoryStatus(cleanedTicket.status) && cleanedTicket.ticketReminderAt) {
+            delete cleanedTicket.ticketReminderAt;
+            delete cleanedTicket.ticketReminderDurationMinutes;
+            needsTicketMigrationSave = true;
+          }
           if (
             cleanedTicket.ticketReminderAt &&
             Number.isNaN(Date.parse(cleanedTicket.ticketReminderAt))
@@ -2527,6 +2532,10 @@
         if (isTicketLocked(ticket) || ticket.status === status) return;
         const changedAt = new Date();
         ticket.status = status;
+        if (isClosedCategoryStatus(status)) {
+          delete ticket.ticketReminderAt;
+          delete ticket.ticketReminderDurationMinutes;
+        }
         updateLastUpdate(index);
         ticket.notes.push({
           date: changedAt.toLocaleString(),
@@ -2558,6 +2567,8 @@
 
           ticket.status = "Closed";
           ticket.closedAt = new Date(now).toISOString();
+          delete ticket.ticketReminderAt;
+          delete ticket.ticketReminderDurationMinutes;
           ticket.notes.push({
             date: new Date(now).toLocaleString(),
             timestamp: now,
@@ -2774,12 +2785,22 @@
         const now = Date.now();
         const dueTickets = [];
         const dueNoteReminders = [];
+        let reminderDataChanged = false;
 
         tickets.forEach((ticket) => {
+          if (isClosedCategoryStatus(ticket.status)) {
+            if (ticket.ticketReminderAt || ticket.ticketReminderDurationMinutes) {
+              delete ticket.ticketReminderAt;
+              delete ticket.ticketReminderDurationMinutes;
+              reminderDataChanged = true;
+            }
+            return;
+          }
           if (!ticket.ticketReminderAt || Date.parse(ticket.ticketReminderAt) > now) return;
           dueTickets.push(ticket);
           delete ticket.ticketReminderAt;
           delete ticket.ticketReminderDurationMinutes;
+          reminderDataChanged = true;
         });
         noteReminders = noteReminders.filter((noteReminder) => {
           if (Date.parse(noteReminder.reminderAt) > now) return true;
@@ -2787,9 +2808,11 @@
           return false;
         });
 
-        if (dueTickets.length) {
+        if (dueTickets.length || reminderDataChanged) {
           save();
           render();
+        }
+        if (dueTickets.length) {
           const ticketNumbers = dueTickets.map((ticket) => ticket.ticketNumber).join(", ");
           pop(`Reminder: ${ticketNumbers}`, dueTickets, "ticket-reminder");
         }
@@ -2858,7 +2881,7 @@
       function getCalendarEvents() {
         const events = [];
         tickets.forEach((ticket, ticketIndex) => {
-          if (ticket.ticketReminderAt) {
+          if (ticket.ticketReminderAt && !isClosedCategoryStatus(ticket.status)) {
             const reminderTime = Date.parse(ticket.ticketReminderAt);
             if (Number.isFinite(reminderTime)) {
               events.push({ ticket, ticketIndex, date: new Date(reminderTime), type: "reminder" });
@@ -3279,7 +3302,7 @@
         const availableTickets = tickets
           .map((ticket, index) => ({ ticket, index }))
           .filter(({ ticket }) =>
-            ticket.status !== "Resolved" && !ticket.ticketReminderAt && !isTicketLocked(ticket)
+            !isClosedCategoryStatus(ticket.status) && !ticket.ticketReminderAt && !isTicketLocked(ticket)
           );
         document.getElementById("unscheduled-ticket-count").textContent = String(availableTickets.length);
         document.getElementById("unscheduled-ticket-list").innerHTML = availableTickets.length
@@ -3691,7 +3714,7 @@
                   `).join("")}
                   <div class="reminder">
                     ${
-                      ticket.ticketReminderAt
+                      ticket.ticketReminderAt && !isClosedCategoryStatus(ticket.status)
                         ? `
                           <p data-reminder-at="${ticket.ticketReminderAt}">
                             Reminder in ${formatCountdown(Date.parse(ticket.ticketReminderAt) - Date.now())}
@@ -3704,6 +3727,8 @@
                             Cancel Reminder
                           </button>
                         `
+                        : isClosedCategoryStatus(ticket.status)
+                        ? ""
                         : `
                           <label for="reminder${index}">Set a ticket reminder</label>
                           <input
@@ -3766,7 +3791,9 @@
         const highPriority = tickets.filter((ticket) =>
           ticket.priority === "High" && !isClosedCategoryStatus(ticket.status)
         ).length;
-        const scheduledReminders = tickets.filter((ticket) => ticket.ticketReminderAt).length;
+        const scheduledReminders = tickets.filter((ticket) =>
+          ticket.ticketReminderAt && !isClosedCategoryStatus(ticket.status)
+        ).length;
 
         document.getElementById("overview-total").textContent = total;
         document.getElementById("overview-active").textContent = active;

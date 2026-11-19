@@ -648,16 +648,13 @@
       }
 
       .calendar-location-control {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        align-items: center;
-        gap: 4px;
+        display: block;
         margin-bottom: 8px;
-        font-size: 0.75rem;
       }
 
       .calendar-location-control select {
         min-width: 0;
+        width: 100%;
         margin: 0;
         padding: 3px;
         font-size: 0.75rem;
@@ -3295,15 +3292,14 @@
             : "";
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
-              <div class="calendar-day-number">${day.getDate()}</div>
               <label class="calendar-location-control">
-                Location
                 <select aria-label="Location for ${escapeAttribute(day.toLocaleDateString())}" onchange="setCalendarLocation('${dayKey}', this.value)">
-                  <option value="" ${location === "" ? "selected" : ""}>Not set</option>
+                  <option value="" ${location === "" ? "selected" : ""}>Location</option>
                   <option value="Home" ${location === "Home" ? "selected" : ""}>Home</option>
                   <option value="Work" ${location === "Work" ? "selected" : ""}>Work</option>
                 </select>
               </label>
+              <div class="calendar-day-number">${day.getDate()}</div>
               <div
                 class="calendar-day-events"
                 data-calendar-date="${dayKey}"

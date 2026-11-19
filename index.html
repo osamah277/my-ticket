@@ -652,6 +652,10 @@
         margin-bottom: 8px;
       }
 
+      .calendar-time-rail-spacer {
+        visibility: hidden;
+      }
+
       .calendar-location-control select {
         min-width: 0;
         width: 100%;
@@ -1832,7 +1836,13 @@
         return location === "Home";
       }
 
-      function getNextAvailableReminderDate(dateKey) {
+      function getNextAvailableReminderDate(
+        dateKey,
+        reminderAt,
+        durationMinutes,
+        excludedTicketIndex,
+        excludedNoteReminderId
+      ) {
         const sourceDate = new Date(`${dateKey}T00:00:00`);
         if (Number.isNaN(sourceDate.getTime())) return null;
         const candidate = new Date(sourceDate);
@@ -1840,7 +1850,17 @@
           candidate.setDate(candidate.getDate() + 1);
           if (candidate.getDay() === 0 || candidate.getDay() === 6) continue;
           if (getCalendarLocation(localDateKey(candidate)) !== "Home") {
-            return candidate;
+            const candidateReminderAt = moveReminderToDate(reminderAt, candidate);
+            const candidateStart = Date.parse(candidateReminderAt);
+            const candidateEnd = candidateStart + durationMinutes * 60 * 1000;
+            if (!findReminderConflict(
+              candidateStart,
+              candidateEnd,
+              excludedTicketIndex,
+              excludedNoteReminderId
+            )) {
+              return candidate;
+            }
           }
         }
         return null;
@@ -1859,17 +1879,25 @@
       }
 
       function relocateRemindersFromHomeDay(dateKey) {
-        const targetDate = getNextAvailableReminderDate(dateKey);
-        if (!targetDate) {
-          pop("No available workday was found for this reminder.");
-          return;
-        }
-
         let ticketsChanged = false;
-        tickets.forEach((ticket) => {
+        tickets.forEach((ticket, ticketIndex) => {
           if (!ticket.ticketReminderAt) return;
           const reminderDate = new Date(ticket.ticketReminderAt);
           if (Number.isNaN(reminderDate.getTime()) || localDateKey(reminderDate) !== dateKey) return;
+          const durationMinutes = Number.isSafeInteger(ticket.ticketReminderDurationMinutes)
+            ? ticket.ticketReminderDurationMinutes
+            : defaultReminderDurationMinutes;
+          const targetDate = getNextAvailableReminderDate(
+            dateKey,
+            ticket.ticketReminderAt,
+            durationMinutes,
+            ticketIndex,
+            ""
+          );
+          if (!targetDate) {
+            pop("No available workday was found for this reminder.");
+            return;
+          }
           ticket.ticketReminderAt = moveReminderToDate(ticket.ticketReminderAt, targetDate);
           ticketsChanged = true;
         });
@@ -1878,6 +1906,20 @@
         noteReminders.forEach((reminder) => {
           const reminderDate = new Date(reminder.reminderAt);
           if (Number.isNaN(reminderDate.getTime()) || localDateKey(reminderDate) !== dateKey) return;
+          const durationMinutes = Number.isSafeInteger(reminder.durationMinutes)
+            ? reminder.durationMinutes
+            : defaultReminderDurationMinutes;
+          const targetDate = getNextAvailableReminderDate(
+            dateKey,
+            reminder.reminderAt,
+            durationMinutes,
+            -1,
+            reminder.id
+          );
+          if (!targetDate) {
+            pop("No available workday was found for this reminder.");
+            return;
+          }
           reminder.reminderAt = moveReminderToDate(reminder.reminderAt, targetDate);
           notesChanged = true;
         });
@@ -3370,6 +3412,9 @@
           <div class="calendar-week" role="row"><div class="calendar-weekday" role="columnheader" aria-label="Time"></div>${weekdays}</div>
           <div class="calendar-week" role="row">
             <div class="calendar-day calendar-time-rail" role="presentation">
+              <div class="calendar-location-control calendar-time-rail-spacer" aria-hidden="true">
+                <select tabindex="-1" disabled><option>Location</option></select>
+              </div>
               <div class="calendar-day-number" aria-hidden="true">&nbsp;</div>
               <div class="calendar-time-scale">${timeScale}</div>
             </div>

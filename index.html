@@ -1615,7 +1615,7 @@
         <div class="calendar-header">
           <h2 id="calendar-title">Reminder Calendar</h2>
         </div>
-        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. Reminders must start on weekdays from 7:35 AM-3:29 PM. Dates marked Home or Work cannot have reminders.</p>
+        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. Reminders must start on workdays from 7:35 AM-3:29 PM. Reminders cannot be scheduled on Home days.</p>
         <div class="calendar-toolbar">
           <div>
             <h3 id="calendar-period-label"></h3>
@@ -1649,7 +1649,7 @@
         <input id="calendar-reminder-time" type="datetime-local" step="60">
         <label for="calendar-reminder-duration">Duration (minutes)</label>
         <input id="calendar-reminder-duration" type="number" min="1" step="1" value="30">
-        <p>Schedule Monday-Friday, with a start time from 7:35 AM through 3:29 PM.</p>
+        <p>Schedule on workdays, with a start time from 7:35 AM through 3:29 PM. Home days are unavailable.</p>
         <p class="delete-confirm-error" id="calendar-reminder-error" role="alert"></p>
         <div class="search-dialog-actions">
           <button class="delete-btn" id="calendar-reminder-cancel" type="button" onclick="cancelReminderFromEditor()" hidden>
@@ -1823,12 +1823,67 @@
           delete calendarLocations[dateKey];
         }
         localStorage.setItem(calendarLocationStorageKey, JSON.stringify(calendarLocations));
+        if (location === "Home") relocateRemindersFromHomeDay(dateKey);
         renderCalendar();
       }
 
       function isReminderDateBlocked(reminderTime) {
         const location = getCalendarLocation(localDateKey(new Date(reminderTime)));
-        return location === "Home" || location === "Work";
+        return location === "Home";
+      }
+
+      function getNextAvailableReminderDate(dateKey) {
+        const sourceDate = new Date(`${dateKey}T00:00:00`);
+        if (Number.isNaN(sourceDate.getTime())) return null;
+        const candidate = new Date(sourceDate);
+        for (let daysAhead = 1; daysAhead <= 3660; daysAhead += 1) {
+          candidate.setDate(candidate.getDate() + 1);
+          if (candidate.getDay() === 0 || candidate.getDay() === 6) continue;
+          if (getCalendarLocation(localDateKey(candidate)) !== "Home") {
+            return candidate;
+          }
+        }
+        return null;
+      }
+
+      function moveReminderToDate(reminderAt, targetDate) {
+        const sourceDate = new Date(reminderAt);
+        const movedDate = new Date(targetDate);
+        movedDate.setHours(
+          sourceDate.getHours(),
+          sourceDate.getMinutes(),
+          sourceDate.getSeconds(),
+          sourceDate.getMilliseconds()
+        );
+        return movedDate.toISOString();
+      }
+
+      function relocateRemindersFromHomeDay(dateKey) {
+        const targetDate = getNextAvailableReminderDate(dateKey);
+        if (!targetDate) {
+          pop("No available workday was found for this reminder.");
+          return;
+        }
+
+        let ticketsChanged = false;
+        tickets.forEach((ticket) => {
+          if (!ticket.ticketReminderAt) return;
+          const reminderDate = new Date(ticket.ticketReminderAt);
+          if (Number.isNaN(reminderDate.getTime()) || localDateKey(reminderDate) !== dateKey) return;
+          ticket.ticketReminderAt = moveReminderToDate(ticket.ticketReminderAt, targetDate);
+          ticketsChanged = true;
+        });
+
+        let notesChanged = false;
+        noteReminders.forEach((reminder) => {
+          const reminderDate = new Date(reminder.reminderAt);
+          if (Number.isNaN(reminderDate.getTime()) || localDateKey(reminderDate) !== dateKey) return;
+          reminder.reminderAt = moveReminderToDate(reminder.reminderAt, targetDate);
+          notesChanged = true;
+        });
+
+        if (ticketsChanged) save();
+        if (notesChanged) saveNoteReminders();
       }
 
       function parseCsv(text) {
@@ -2682,7 +2737,7 @@
           return "Choose a reminder time in the future";
         }
         if (isReminderDateBlocked(reminderTime)) {
-          return "Reminders can't be scheduled on dates marked Home or Work";
+          return "Reminders can't be scheduled on dates marked Home";
         }
 
         const durationMinutes = Number(durationValue);
@@ -2750,7 +2805,7 @@
           return "Choose a reminder time in the future";
         }
         if (isReminderDateBlocked(reminderTime)) {
-          return "Reminders can't be scheduled on dates marked Home or Work";
+          return "Reminders can't be scheduled on dates marked Home";
         }
 
         const durationMinutes = Number(durationValue);

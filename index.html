@@ -647,6 +647,22 @@
         vertical-align: top;
       }
 
+      .calendar-location-control {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        align-items: center;
+        gap: 4px;
+        margin-bottom: 8px;
+        font-size: 0.75rem;
+      }
+
+      .calendar-location-control select {
+        min-width: 0;
+        margin: 0;
+        padding: 3px;
+        font-size: 0.75rem;
+      }
+
       .calendar-day-events {
         position: relative;
         height: 960px;
@@ -1602,9 +1618,12 @@
         <div class="calendar-header">
           <h2 id="calendar-title">Reminder Calendar</h2>
         </div>
-        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. Reminders must start on weekdays from 7:35 AM-3:29 PM.</p>
+        <p>Drag a ticket without a reminder onto a weekday to schedule it; the drop position sets its start time. Reminders must start on weekdays from 7:35 AM-3:29 PM. Dates marked Home or Work cannot have reminders.</p>
         <div class="calendar-toolbar">
-          <h3 id="calendar-period-label"></h3>
+          <div>
+            <h3 id="calendar-period-label"></h3>
+            <p id="calendar-location-stats" aria-live="polite"></p>
+          </div>
           <div class="calendar-navigation">
             <button class="btn" type="button" onclick="openNoteReminderEditor()">Add Note Reminder</button>
             <button class="search-clear" type="button" onclick="changeCalendarWeek(-1)">Previous Week</button>
@@ -1666,6 +1685,7 @@
       localStorage.removeItem("ticket_dashboard_delete_password");
       const storageKey = "tickets_v4";
       const noteReminderStorageKey = "ticket_dashboard_note_reminders";
+      const calendarLocationStorageKey = "ticket_dashboard_calendar_locations";
       const profileStorageKey = "ticket_dashboard_profile";
       const osamahLunchTimeStorageKey = "ticket_dashboard_osamah_lunch_time";
       const themeStorageKey = "ticket_dashboard_theme";
@@ -1683,6 +1703,7 @@
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
+      let calendarLocations = JSON.parse(localStorage.getItem(calendarLocationStorageKey) || "{}");
       let preferredColumnWidths = {};
       let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
       let activeTheme = localStorage.getItem(themeStorageKey) === "dark" ? "dark" : "light";
@@ -1786,6 +1807,31 @@
 
       function saveNoteReminders() {
         localStorage.setItem(noteReminderStorageKey, JSON.stringify(noteReminders));
+      }
+
+      function getCalendarLocation(dateKey) {
+        return ["Home", "Work"].includes(calendarLocations[dateKey])
+          ? calendarLocations[dateKey]
+          : "";
+      }
+
+      function setCalendarLocation(dateKey, location) {
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(dateKey) ||
+          (location !== "" && !["Home", "Work"].includes(location))) {
+          return;
+        }
+        if (location) {
+          calendarLocations[dateKey] = location;
+        } else {
+          delete calendarLocations[dateKey];
+        }
+        localStorage.setItem(calendarLocationStorageKey, JSON.stringify(calendarLocations));
+        renderCalendar();
+      }
+
+      function isReminderDateBlocked(reminderTime) {
+        const location = getCalendarLocation(localDateKey(new Date(reminderTime)));
+        return location === "Home" || location === "Work";
       }
 
       function parseCsv(text) {
@@ -2638,6 +2684,9 @@
         if (!dateTimeValue || !Number.isFinite(reminderTime) || reminderTime <= Date.now()) {
           return "Choose a reminder time in the future";
         }
+        if (isReminderDateBlocked(reminderTime)) {
+          return "Reminders can't be scheduled on dates marked Home or Work";
+        }
 
         const durationMinutes = Number(durationValue);
         if (!Number.isSafeInteger(durationMinutes) || durationMinutes < 1) {
@@ -2702,6 +2751,9 @@
         const reminderTime = Date.parse(dateTimeValue);
         if (!dateTimeValue || !Number.isFinite(reminderTime) || reminderTime <= Date.now()) {
           return "Choose a reminder time in the future";
+        }
+        if (isReminderDateBlocked(reminderTime)) {
+          return "Reminders can't be scheduled on dates marked Home or Work";
         }
 
         const durationMinutes = Number(durationValue);
@@ -3226,6 +3278,7 @@
         const dayCells = Array.from({ length: 5 }, (_, dayOffset) => {
           const day = new Date(weekStart.getFullYear(), weekStart.getMonth(), weekStart.getDate() + dayOffset);
           const dayKey = localDateKey(day);
+          const location = getCalendarLocation(dayKey);
           const dayEvents = eventsByDate.get(dayKey) || [];
           const closedOutsideHours = dayEvents
             .filter((event) => event.type === "closed")
@@ -3243,6 +3296,14 @@
           return `
             <div class="${dayClass}" role="gridcell" aria-label="${escapeAttribute(day.toLocaleDateString())}">
               <div class="calendar-day-number">${day.getDate()}</div>
+              <label class="calendar-location-control">
+                Location
+                <select aria-label="Location for ${escapeAttribute(day.toLocaleDateString())}" onchange="setCalendarLocation('${dayKey}', this.value)">
+                  <option value="" ${location === "" ? "selected" : ""}>Not set</option>
+                  <option value="Home" ${location === "Home" ? "selected" : ""}>Home</option>
+                  <option value="Work" ${location === "Work" ? "selected" : ""}>Work</option>
+                </select>
+              </label>
               <div
                 class="calendar-day-events"
                 data-calendar-date="${dayKey}"
@@ -3265,6 +3326,16 @@
           </div>
         </div></div>`;
         document.getElementById("calendar-period-label").textContent = weekLabel;
+        const locationCounts = Array.from({ length: 5 }, (_, dayOffset) =>
+          getCalendarLocation(localDateKey(new Date(
+            weekStart.getFullYear(),
+            weekStart.getMonth(),
+            weekStart.getDate() + dayOffset
+          )))
+        );
+        document.getElementById("calendar-location-stats").textContent =
+          `Home: ${locationCounts.filter((location) => location === "Home").length} days · ` +
+          `Work: ${locationCounts.filter((location) => location === "Work").length} days`;
         document.getElementById("calendar-view-content").innerHTML = grid;
         renderUnscheduledTickets();
         updateCalendarCurrentTime();

@@ -1111,6 +1111,82 @@
         gap: 12px;
       }
 
+      .my-status {
+        display: grid;
+        gap: 12px;
+        padding: 18px;
+        border: 1px solid #d3dce6;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .my-status-heading {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 12px;
+      }
+
+      .my-status-heading h3,
+      .my-status-heading p {
+        margin: 0;
+      }
+
+      .my-status-heading p {
+        color: #667085;
+        font-size: 0.85rem;
+      }
+
+      .my-status-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .my-status-stat {
+        min-height: 92px;
+        padding: 14px;
+        border: 1px solid #e8edf3;
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+
+      .my-status-stat-label {
+        display: block;
+        min-height: 34px;
+        color: #667085;
+        font-size: 0.8rem;
+        font-weight: 600;
+      }
+
+      .my-status-stat strong {
+        display: block;
+        margin-top: 6px;
+        color: #2563eb;
+        font-size: 1.55rem;
+        line-height: 1;
+      }
+
+      .dark-mode .my-status {
+        color: #e5e7eb;
+        border-color: #3a4351;
+        background: #242b36;
+      }
+
+      .dark-mode .my-status-heading p,
+      .dark-mode .my-status-stat-label {
+        color: #aab4c2;
+      }
+
+      .dark-mode .my-status-stat {
+        border-color: #3a4351;
+        background: #1c222c;
+      }
+
+      .dark-mode .my-status-stat strong {
+        color: #93bdf5;
+      }
+
       .overview-stat {
         min-height: 112px;
         padding: 18px;
@@ -1270,6 +1346,12 @@
         background: #35465c;
       }
 
+      @media (max-width: 900px) {
+        .my-status-grid {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+      }
+
       @media (max-width: 600px) {
         body {
           margin: 12px;
@@ -1281,6 +1363,10 @@
         }
 
         .overview-stats {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .my-status-grid {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
@@ -1443,6 +1529,38 @@
             <strong class="overview-stat-value" id="overview-reminders">0</strong>
           </article>
         </div>
+        <section class="my-status" aria-labelledby="my-status-title">
+          <div class="my-status-heading">
+            <h3 id="my-status-title">My status</h3>
+            <p id="my-status-profile">Your ticket activity</p>
+          </div>
+          <div class="my-status-grid">
+            <article class="my-status-stat">
+              <span class="my-status-stat-label">Completed today</span>
+              <strong id="my-status-completed-today">0</strong>
+            </article>
+            <article class="my-status-stat">
+              <span class="my-status-stat-label">Completed this week</span>
+              <strong id="my-status-completed-week">0</strong>
+            </article>
+            <article class="my-status-stat">
+              <span class="my-status-stat-label">Closed this month</span>
+              <strong id="my-status-closed-month">0</strong>
+            </article>
+            <article class="my-status-stat">
+              <span class="my-status-stat-label">Assigned today</span>
+              <strong id="my-status-assigned-today">0</strong>
+            </article>
+            <article class="my-status-stat">
+              <span class="my-status-stat-label">Assigned this week</span>
+              <strong id="my-status-assigned-week">0</strong>
+            </article>
+            <article class="my-status-stat">
+              <span class="my-status-stat-label">Assigned this month</span>
+              <strong id="my-status-assigned-month">0</strong>
+            </article>
+          </div>
+        </section>
         <div class="overview-panels">
           <section class="overview-panel" aria-labelledby="overview-status-title">
             <h3 id="overview-status-title">Tickets by status</h3>
@@ -3945,6 +4063,69 @@
       }
 
       function renderDashboard() {
+        const now = new Date();
+        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const startOfWeek = new Date(startOfToday);
+        const weekDay = startOfWeek.getDay();
+        startOfWeek.setDate(startOfWeek.getDate() - (weekDay === 0 ? 6 : weekDay - 1));
+        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(endOfWeek.getDate() + 7);
+        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        const isInRange = (timestamp, start, end) =>
+          timestamp >= start.getTime() && timestamp < end.getTime();
+        const getAssignedTimestamp = (assignedDate) => {
+          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(assignedDate || "");
+          return match
+            ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime()
+            : NaN;
+        };
+        const getCompletedTimestamp = (ticket) => {
+          const completedAt = ticket.status === "Closed"
+            ? ticket.closedAt
+            : ticket.resolvedAt;
+          const timestamp = Date.parse(completedAt || ticket.lastUpdateAt || ticket.createdAt);
+          return Number.isFinite(timestamp) ? timestamp : NaN;
+        };
+        const getClosedTimestamp = (ticket) => {
+          const timestamp = Date.parse(ticket.closedAt || ticket.lastUpdateAt || ticket.createdAt);
+          return Number.isFinite(timestamp) ? timestamp : NaN;
+        };
+
+        const completedTickets = tickets.filter((ticket) =>
+          ticket.status === "Resolved" || ticket.status === "Closed"
+        );
+        const completedToday = completedTickets.filter((ticket) =>
+          isInRange(getCompletedTimestamp(ticket), startOfToday, endOfToday)
+        ).length;
+        const completedWeek = completedTickets.filter((ticket) =>
+          isInRange(getCompletedTimestamp(ticket), startOfWeek, endOfWeek)
+        ).length;
+        const closedMonth = tickets.filter((ticket) =>
+          ticket.status === "Closed" &&
+          isInRange(getClosedTimestamp(ticket), startOfMonth, endOfMonth)
+        ).length;
+
+        const assignedToday = tickets.filter((ticket) =>
+          isInRange(getAssignedTimestamp(ticket.assignedDate), startOfToday, endOfToday)
+        ).length;
+        const assignedWeek = tickets.filter((ticket) =>
+          isInRange(getAssignedTimestamp(ticket.assignedDate), startOfWeek, endOfWeek)
+        ).length;
+        const assignedMonth = tickets.filter((ticket) =>
+          isInRange(getAssignedTimestamp(ticket.assignedDate), startOfMonth, endOfMonth)
+        ).length;
+
+        document.getElementById("my-status-profile").textContent =
+          `${activeProfile === "osamah" ? "Osamah" : "Steven"}'s ticket activity`;
+        document.getElementById("my-status-completed-today").textContent = completedToday;
+        document.getElementById("my-status-completed-week").textContent = completedWeek;
+        document.getElementById("my-status-closed-month").textContent = closedMonth;
+        document.getElementById("my-status-assigned-today").textContent = assignedToday;
+        document.getElementById("my-status-assigned-week").textContent = assignedWeek;
+        document.getElementById("my-status-assigned-month").textContent = assignedMonth;
+
         const statusCounts = [
           ["Assigned", tickets.filter((ticket) => ticket.status === "Assigned").length],
           ["In Progress", tickets.filter((ticket) => ticket.status === "In Progress").length],

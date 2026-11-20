@@ -1492,8 +1492,8 @@
           <select id="st">
             <option>Assigned</option>
             <option>In Progress</option>
-            <option>Pending Customer</option>
-            <option>Pending Vendor</option>
+            <option>Pending</option>
+            <option>Staged</option>
             <option>Resolved</option>
             <option>Closed</option>
           </select>
@@ -1544,8 +1544,8 @@
               <option value="">All statuses</option>
               <option>Assigned</option>
               <option>In Progress</option>
-              <option>Pending Customer</option>
-              <option>Pending Vendor</option>
+              <option>Pending</option>
+              <option>Staged</option>
               <option>Resolved</option>
               <option>Closed</option>
             </select>
@@ -1741,6 +1741,10 @@
             needsTicketMigrationSave = true;
           }
           if (cleanedTicket.status === "Open") cleanedTicket.status = "Assigned";
+          if (["Pending Customer", "Pending Vendor"].includes(cleanedTicket.status)) {
+            cleanedTicket.status = "Pending";
+            needsTicketMigrationSave = true;
+          }
           if (!["High", "Medium", "Low"].includes(cleanedTicket.priority)) {
             cleanedTicket.priority = "Medium";
           }
@@ -2008,10 +2012,10 @@
               ? statusValue.toLowerCase() === "open"
                 ? "Assigned"
                 : statusValue.toLowerCase() === "staged"
-                  ? "Pending Vendor"
-                : ["pending", "pinding"].includes(statusValue.toLowerCase())
-                  ? "Pending Customer"
-                : ["Assigned", "In Progress", "Pending Customer", "Pending Vendor", "Resolved", "Closed"]
+                  ? "Staged"
+                : ["pending customer", "pending vendor", "pending", "pinding"].includes(statusValue.toLowerCase())
+                  ? "Pending"
+                : ["Assigned", "In Progress", "Pending", "Staged", "Resolved", "Closed"]
                   .find((value) => value.toLowerCase() === statusValue.toLowerCase())
               : "Assigned";
 
@@ -3857,8 +3861,8 @@
                     <option selected>${ticket.status}</option>
                     <option>Assigned</option>
                     <option>In Progress</option>
-                    <option>Pending Customer</option>
-                    <option>Pending Vendor</option>
+                    <option>Pending</option>
+                    <option>Staged</option>
                     <option>Resolved</option>
                     <option>Closed</option>
                   </select>
@@ -3944,8 +3948,8 @@
         const statusCounts = [
           ["Assigned", tickets.filter((ticket) => ticket.status === "Assigned").length],
           ["In Progress", tickets.filter((ticket) => ticket.status === "In Progress").length],
-          ["Pending Customer", tickets.filter((ticket) => ticket.status === "Pending Customer").length],
-          ["Pending Vendor", tickets.filter((ticket) => ticket.status === "Pending Vendor").length],
+          ["Pending", tickets.filter((ticket) => ticket.status === "Pending").length],
+          ["Staged", tickets.filter((ticket) => ticket.status === "Staged").length],
           ["Resolved", tickets.filter((ticket) => ticket.status === "Resolved").length],
           ["Closed", tickets.filter((ticket) => ticket.status === "Closed").length],
         ];

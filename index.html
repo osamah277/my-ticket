@@ -1111,82 +1111,6 @@
         gap: 12px;
       }
 
-      .my-status {
-        display: grid;
-        gap: 12px;
-        padding: 18px;
-        border: 1px solid #d3dce6;
-        border-radius: 10px;
-        background: #fff;
-      }
-
-      .my-status-heading {
-        display: flex;
-        align-items: baseline;
-        justify-content: space-between;
-        gap: 12px;
-      }
-
-      .my-status-heading h3,
-      .my-status-heading p {
-        margin: 0;
-      }
-
-      .my-status-heading p {
-        color: #667085;
-        font-size: 0.85rem;
-      }
-
-      .my-status-grid {
-        display: grid;
-        grid-template-columns: repeat(6, minmax(0, 1fr));
-        gap: 10px;
-      }
-
-      .my-status-stat {
-        min-height: 92px;
-        padding: 14px;
-        border: 1px solid #e8edf3;
-        border-radius: 8px;
-        background: #f8fafc;
-      }
-
-      .my-status-stat-label {
-        display: block;
-        min-height: 34px;
-        color: #667085;
-        font-size: 0.8rem;
-        font-weight: 600;
-      }
-
-      .my-status-stat strong {
-        display: block;
-        margin-top: 6px;
-        color: #2563eb;
-        font-size: 1.55rem;
-        line-height: 1;
-      }
-
-      .dark-mode .my-status {
-        color: #e5e7eb;
-        border-color: #3a4351;
-        background: #242b36;
-      }
-
-      .dark-mode .my-status-heading p,
-      .dark-mode .my-status-stat-label {
-        color: #aab4c2;
-      }
-
-      .dark-mode .my-status-stat {
-        border-color: #3a4351;
-        background: #1c222c;
-      }
-
-      .dark-mode .my-status-stat strong {
-        color: #93bdf5;
-      }
-
       .overview-stat {
         min-height: 112px;
         padding: 18px;
@@ -1346,10 +1270,155 @@
         background: #35465c;
       }
 
-      @media (max-width: 900px) {
-        .my-status-grid {
-          grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
+      .status-page {
+        display: grid;
+        gap: 16px;
+      }
+
+      .status-page[hidden] {
+        display: none;
+      }
+
+      .status-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .status-heading h2,
+      .status-heading p {
+        margin: 0;
+      }
+
+      .status-heading p {
+        margin-top: 4px;
+        color: #667085;
+      }
+
+      .status-controls {
+        display: flex;
+        align-items: end;
+        gap: 8px;
+      }
+
+      .status-controls label {
+        display: grid;
+        gap: 4px;
+        color: #667085;
+        font-size: 0.82rem;
+        font-weight: 600;
+      }
+
+      .status-controls input {
+        min-width: 150px;
+        padding: 8px 10px;
+        border: 1px solid #d3dce6;
+        border-radius: 6px;
+        background: #fff;
+      }
+
+      .status-table-wrap,
+      .status-leaderboard {
+        overflow-x: auto;
+        border: 1px solid #d3dce6;
+        border-radius: 10px;
+        background: #fff;
+      }
+
+      .status-table {
+        width: 100%;
+        border-collapse: collapse;
+      }
+
+      .status-table th,
+      .status-table td {
+        padding: 14px 16px;
+        border-bottom: 1px solid #e8edf3;
+        text-align: left;
+      }
+
+      .status-table tr:last-child td {
+        border-bottom: 0;
+      }
+
+      .status-table th {
+        color: #667085;
+        background: #f8fafc;
+        font-size: 0.82rem;
+      }
+
+      .status-table td:not(:first-child) {
+        font-size: 1.15rem;
+        font-weight: 700;
+      }
+
+      .status-leaderboard {
+        padding: 18px;
+      }
+
+      .status-leaderboard h3 {
+        margin: 0 0 14px;
+      }
+
+      .status-leaderboard-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .status-leader {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        align-items: center;
+        gap: 12px;
+        padding: 14px;
+        border: 1px solid #e8edf3;
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+
+      .status-leader strong {
+        color: #2563eb;
+        font-size: 1.8rem;
+      }
+
+      .status-leader.is-leading {
+        border-color: #93bdf5;
+        background: #eef6ff;
+      }
+
+      .dark-mode .status-heading p,
+      .dark-mode .status-controls label {
+        color: #aab4c2;
+      }
+
+      .dark-mode .status-controls input,
+      .dark-mode .status-table-wrap,
+      .dark-mode .status-leaderboard {
+        color: #e5e7eb;
+        border-color: #3a4351;
+        background: #242b36;
+      }
+
+      .dark-mode .status-table th,
+      .dark-mode .status-leader {
+        color: #e5e7eb;
+        border-color: #3a4351;
+        background: #1c222c;
+      }
+
+      .dark-mode .status-table td {
+        border-color: #3a4351;
+      }
+
+      .dark-mode .status-leader.is-leading {
+        border-color: #6089bb;
+        background: #26384d;
+      }
+
+      .dark-mode .status-leader strong {
+        color: #93bdf5;
       }
 
       @media (max-width: 600px) {
@@ -1362,11 +1431,22 @@
           flex-direction: column;
         }
 
-        .overview-stats {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .status-heading {
+          align-items: flex-start;
+          flex-direction: column;
         }
 
-        .my-status-grid {
+        .status-controls,
+        .status-controls label,
+        .status-controls input {
+          width: 100%;
+        }
+
+        .status-leaderboard-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .overview-stats {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
 
@@ -1498,6 +1578,9 @@
         <button class="page-tab" type="button" aria-pressed="false" onclick="setActivePage('tickets')">
           Tickets
         </button>
+        <button class="page-tab" type="button" aria-pressed="false" onclick="setActivePage('status')">
+          Status
+        </button>
         <button class="page-tab" type="button" aria-pressed="false" onclick="setActivePage('calendar')">
           Calendar
         </button>
@@ -1529,38 +1612,6 @@
             <strong class="overview-stat-value" id="overview-reminders">0</strong>
           </article>
         </div>
-        <section class="my-status" aria-labelledby="my-status-title">
-          <div class="my-status-heading">
-            <h3 id="my-status-title">My status</h3>
-            <p id="my-status-profile">Your ticket activity</p>
-          </div>
-          <div class="my-status-grid">
-            <article class="my-status-stat">
-              <span class="my-status-stat-label">Completed today</span>
-              <strong id="my-status-completed-today">0</strong>
-            </article>
-            <article class="my-status-stat">
-              <span class="my-status-stat-label">Completed this week</span>
-              <strong id="my-status-completed-week">0</strong>
-            </article>
-            <article class="my-status-stat">
-              <span class="my-status-stat-label">Closed this month</span>
-              <strong id="my-status-closed-month">0</strong>
-            </article>
-            <article class="my-status-stat">
-              <span class="my-status-stat-label">Assigned today</span>
-              <strong id="my-status-assigned-today">0</strong>
-            </article>
-            <article class="my-status-stat">
-              <span class="my-status-stat-label">Assigned this week</span>
-              <strong id="my-status-assigned-week">0</strong>
-            </article>
-            <article class="my-status-stat">
-              <span class="my-status-stat-label">Assigned this month</span>
-              <strong id="my-status-assigned-month">0</strong>
-            </article>
-          </div>
-        </section>
         <div class="overview-panels">
           <section class="overview-panel" aria-labelledby="overview-status-title">
             <h3 id="overview-status-title">Tickets by status</h3>
@@ -1574,6 +1625,63 @@
         <section class="overview-panel" aria-labelledby="overview-recent-title">
           <h3 id="overview-recent-title">Recently updated</h3>
           <div class="overview-recent" id="overview-recent"></div>
+        </section>
+      </section>
+
+      <section class="status-page" id="status-page" aria-labelledby="status-title" hidden>
+        <div class="status-heading">
+          <div>
+            <h2 id="status-title">Status</h2>
+            <p id="status-profile">Ticket activity</p>
+          </div>
+          <div class="status-controls">
+            <label for="status-date">
+              Select date
+              <input type="date" id="status-date" onchange="renderStatus()">
+            </label>
+          </div>
+        </div>
+
+        <div class="status-table-wrap">
+          <table class="status-table" aria-label="Ticket status metrics">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Today</th>
+                <th>This week</th>
+                <th>This month</th>
+                <th id="status-selected-heading">Selected date</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Completed tasks</td>
+                <td id="status-completed-today">0</td>
+                <td id="status-completed-week">0</td>
+                <td id="status-completed-month">0</td>
+                <td id="status-completed-selected">0</td>
+              </tr>
+              <tr>
+                <td>Assigned tasks</td>
+                <td id="status-assigned-today">0</td>
+                <td id="status-assigned-week">0</td>
+                <td id="status-assigned-month">0</td>
+                <td id="status-assigned-selected">0</td>
+              </tr>
+              <tr>
+                <td>Closed tickets</td>
+                <td id="status-closed-today">0</td>
+                <td id="status-closed-week">0</td>
+                <td id="status-closed-month">0</td>
+                <td id="status-closed-selected">0</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <section class="status-leaderboard" aria-labelledby="status-leaderboard-title">
+          <h3 id="status-leaderboard-title">Most closed tasks - AM vs PS</h3>
+          <div class="status-leaderboard-grid" id="status-leaderboard"></div>
         </section>
       </section>
 
@@ -3120,16 +3228,18 @@
       }
 
       function setActivePage(page) {
-        if (page !== "overview" && page !== "tickets" && page !== "calendar") return;
+        if (!["overview", "tickets", "status", "calendar"].includes(page)) return;
         activePage = page;
         document.getElementById("overview-page").hidden = page !== "overview";
         document.getElementById("ticket-page").hidden = page !== "tickets";
+        document.getElementById("status-page").hidden = page !== "status";
         document.getElementById("calendar-page").hidden = page !== "calendar";
         document.querySelectorAll(".page-tab").forEach((button) => {
           button.setAttribute("aria-pressed", String(button.textContent.trim().toLowerCase() === page));
         });
         if (page === "calendar") renderCalendar();
         else if (page === "tickets") updateTableWidth();
+        else if (page === "status") renderStatus();
       }
 
       function goToCurrentWeek() {
@@ -3917,6 +4027,7 @@
         const isSorted = appliedTicketSearch.sort !== "";
 
         renderDashboard();
+        renderStatus();
         document.getElementById("ticket-table").className = `table profile-${activeProfile}`;
         updateTableWidth();
         document.querySelectorAll(".settings-panel [data-profile]").forEach((button) => {
@@ -4062,70 +4173,164 @@
         if (activePage === "calendar") renderCalendar();
       }
 
-      function renderDashboard() {
-        const now = new Date();
-        const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        const startOfWeek = new Date(startOfToday);
-        const weekDay = startOfWeek.getDay();
-        startOfWeek.setDate(startOfWeek.getDate() - (weekDay === 0 ? 6 : weekDay - 1));
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const endOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-        const endOfWeek = new Date(startOfWeek);
-        endOfWeek.setDate(endOfWeek.getDate() + 7);
-        const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        const isInRange = (timestamp, start, end) =>
-          timestamp >= start.getTime() && timestamp < end.getTime();
-        const getAssignedTimestamp = (assignedDate) => {
-          const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(assignedDate || "");
-          return match
-            ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime()
-            : NaN;
-        };
-        const getCompletedTimestamp = (ticket) => {
-          const completedAt = ticket.status === "Closed"
-            ? ticket.closedAt
-            : ticket.resolvedAt;
-          const timestamp = Date.parse(completedAt || ticket.lastUpdateAt || ticket.createdAt);
-          return Number.isFinite(timestamp) ? timestamp : NaN;
-        };
-        const getClosedTimestamp = (ticket) => {
-          const timestamp = Date.parse(ticket.closedAt || ticket.lastUpdateAt || ticket.createdAt);
-          return Number.isFinite(timestamp) ? timestamp : NaN;
-        };
+      function getStartOfWeek(date) {
+        const start = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+        const day = start.getDay();
+        start.setDate(start.getDate() - (day === 0 ? 6 : day - 1));
+        return start;
+      }
+
+      function getAssignedTicketTimestamp(assignedDate) {
+        const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(assignedDate || "");
+        return match
+          ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])).getTime()
+          : NaN;
+      }
+
+      function getCompletedTicketTimestamp(ticket) {
+        const completedAt = ticket.status === "Closed"
+          ? ticket.closedAt
+          : ticket.resolvedAt;
+        const timestamp = Date.parse(completedAt || ticket.lastUpdateAt || ticket.createdAt);
+        return Number.isFinite(timestamp) ? timestamp : NaN;
+      }
+
+      function getClosedTicketTimestamp(ticket) {
+        const timestamp = Date.parse(ticket.closedAt || ticket.lastUpdateAt || ticket.createdAt);
+        return Number.isFinite(timestamp) ? timestamp : NaN;
+      }
+
+      function isTimestampInRange(timestamp, start, end) {
+        return Number.isFinite(timestamp) &&
+          timestamp >= start.getTime() &&
+          timestamp < end.getTime();
+      }
+
+      function renderStatus() {
+        const dateInput = document.getElementById("status-date");
+        const today = new Date();
+        if (!dateInput.value) {
+          dateInput.value = [
+            today.getFullYear(),
+            String(today.getMonth() + 1).padStart(2, "0"),
+            String(today.getDate()).padStart(2, "0"),
+          ].join("-");
+        }
+
+        const selectedMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateInput.value);
+        const selectedDate = selectedMatch
+          ? new Date(Number(selectedMatch[1]), Number(selectedMatch[2]) - 1, Number(selectedMatch[3]))
+          : new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const selectedKey = [
+          selectedDate.getFullYear(),
+          String(selectedDate.getMonth() + 1).padStart(2, "0"),
+          String(selectedDate.getDate()).padStart(2, "0"),
+        ].join("-");
+
+        document.getElementById("status-profile").textContent =
+          `${activeProfile === "osamah" ? "Osamah" : "Steven"}'s ticket activity`;
+        document.getElementById("status-selected-heading").textContent =
+          formatDate(selectedKey, { month: "short", day: "numeric", year: "numeric" });
+
+        const startToday = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const endToday = new Date(startToday);
+        endToday.setDate(endToday.getDate() + 1);
+        const startWeek = getStartOfWeek(today);
+        const endWeek = new Date(startWeek);
+        endWeek.setDate(endWeek.getDate() + 7);
+        const startMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+        const endMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+        const startSelected = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          selectedDate.getDate()
+        );
+        const endSelected = new Date(startSelected);
+        endSelected.setDate(endSelected.getDate() + 1);
 
         const completedTickets = tickets.filter((ticket) =>
           ticket.status === "Resolved" || ticket.status === "Closed"
         );
-        const completedToday = completedTickets.filter((ticket) =>
-          isInRange(getCompletedTimestamp(ticket), startOfToday, endOfToday)
+        const closedTickets = tickets.filter((ticket) => ticket.status === "Closed");
+        const countCompleted = (start, end) => completedTickets.filter((ticket) =>
+          isTimestampInRange(getCompletedTicketTimestamp(ticket), start, end)
         ).length;
-        const completedWeek = completedTickets.filter((ticket) =>
-          isInRange(getCompletedTimestamp(ticket), startOfWeek, endOfWeek)
+        const countClosed = (start, end) => closedTickets.filter((ticket) =>
+          isTimestampInRange(getClosedTicketTimestamp(ticket), start, end)
         ).length;
-        const closedMonth = tickets.filter((ticket) =>
-          ticket.status === "Closed" &&
-          isInRange(getClosedTimestamp(ticket), startOfMonth, endOfMonth)
-        ).length;
-
-        const assignedToday = tickets.filter((ticket) =>
-          isInRange(getAssignedTimestamp(ticket.assignedDate), startOfToday, endOfToday)
-        ).length;
-        const assignedWeek = tickets.filter((ticket) =>
-          isInRange(getAssignedTimestamp(ticket.assignedDate), startOfWeek, endOfWeek)
-        ).length;
-        const assignedMonth = tickets.filter((ticket) =>
-          isInRange(getAssignedTimestamp(ticket.assignedDate), startOfMonth, endOfMonth)
+        const countAssigned = (start, end) => tickets.filter((ticket) =>
+          isTimestampInRange(getAssignedTicketTimestamp(ticket.assignedDate), start, end)
         ).length;
 
-        document.getElementById("my-status-profile").textContent =
-          `${activeProfile === "osamah" ? "Osamah" : "Steven"}'s ticket activity`;
-        document.getElementById("my-status-completed-today").textContent = completedToday;
-        document.getElementById("my-status-completed-week").textContent = completedWeek;
-        document.getElementById("my-status-closed-month").textContent = closedMonth;
-        document.getElementById("my-status-assigned-today").textContent = assignedToday;
-        document.getElementById("my-status-assigned-week").textContent = assignedWeek;
-        document.getElementById("my-status-assigned-month").textContent = assignedMonth;
+        document.getElementById("status-completed-today").textContent =
+          countCompleted(startToday, endToday);
+        document.getElementById("status-completed-week").textContent =
+          countCompleted(startWeek, endWeek);
+        document.getElementById("status-completed-month").textContent =
+          countCompleted(startMonth, endMonth);
+        document.getElementById("status-completed-selected").textContent =
+          countCompleted(startSelected, endSelected);
 
+        document.getElementById("status-assigned-today").textContent =
+          countAssigned(startToday, endToday);
+        document.getElementById("status-assigned-week").textContent =
+          countAssigned(startWeek, endWeek);
+        document.getElementById("status-assigned-month").textContent =
+          countAssigned(startMonth, endMonth);
+        document.getElementById("status-assigned-selected").textContent =
+          countAssigned(startSelected, endSelected);
+
+        document.getElementById("status-closed-today").textContent =
+          countClosed(startToday, endToday);
+        document.getElementById("status-closed-week").textContent =
+          countClosed(startWeek, endWeek);
+        document.getElementById("status-closed-month").textContent =
+          countClosed(startMonth, endMonth);
+        document.getElementById("status-closed-selected").textContent =
+          countClosed(startSelected, endSelected);
+
+        const leaderboardStart = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth(),
+          1
+        );
+        const leaderboardEnd = new Date(
+          selectedDate.getFullYear(),
+          selectedDate.getMonth() + 1,
+          1
+        );
+        const amCount = closedTickets.filter((ticket) =>
+          (ticket.ticketFrom || "").trim().toUpperCase() === "AM" &&
+          isTimestampInRange(getClosedTicketTimestamp(ticket), leaderboardStart, leaderboardEnd)
+        ).length;
+        const psCount = closedTickets.filter((ticket) =>
+          (ticket.ticketFrom || "").trim().toUpperCase() === "PS" &&
+          isTimestampInRange(getClosedTicketTimestamp(ticket), leaderboardStart, leaderboardEnd)
+        ).length;
+        const highest = Math.max(amCount, psCount);
+        const amLeading = highest > 0 && amCount === highest;
+        const psLeading = highest > 0 && psCount === highest;
+        document.getElementById("status-leaderboard").innerHTML = [
+          ["AM", amCount, amLeading],
+          ["PS", psCount, psLeading],
+        ].map(([label, count, leading]) => `
+          <article class="status-leader${leading ? " is-leading" : ""}">
+            <div>
+              <span>${escapeHtml(label)}</span>
+              ${leading ? `<div class="overview-empty">${amCount === psCount ? "Tied for most" : "Most closed"}</div>` : ""}
+            </div>
+            <strong>${count}</strong>
+          </article>
+        `).join("");
+
+        document.getElementById("status-leaderboard-title").textContent =
+          `Most closed tasks - AM vs PS (${formatDate(
+            leaderboardStart,
+            { month: "long", year: "numeric" }
+          )})`;
+      }
+
+      function renderDashboard() {
         const statusCounts = [
           ["Assigned", tickets.filter((ticket) => ticket.status === "Assigned").length],
           ["In Progress", tickets.filter((ticket) => ticket.status === "In Progress").length],

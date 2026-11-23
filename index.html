@@ -666,7 +666,7 @@
 
       .calendar-day-events {
         position: relative;
-        height: 960px;
+        height: var(--calendar-timeline-height);
         background-image: repeating-linear-gradient(
           to bottom,
           transparent 0,
@@ -720,7 +720,7 @@
 
       .calendar-time-scale {
         position: relative;
-        height: 960px;
+        height: var(--calendar-timeline-height);
         color: #788493;
         font-size: 0.7rem;
         text-align: right;
@@ -1701,6 +1701,7 @@
       const resolvedClosureInterval = 5 * 24 * 60 * 60 * 1000;
       const defaultReminderDurationMinutes = 30;
       const calendarDisplayStartMinute = 7 * 60 + 30;
+      const calendarTimelineStartMinute = 7 * 60;
       const calendarDisplayEndMinute = 15 * 60 + 30;
       const calendarPixelsPerMinute = 2;
       const calendarWeekdays = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
@@ -3198,7 +3199,7 @@
         if (draggedCalendarLunch) {
           const lunchMinute = Math.max(
             calendarDisplayStartMinute,
-            Math.min(calendarDisplayEndMinute - 60, calendarDisplayStartMinute + minuteOffset)
+            Math.min(calendarDisplayEndMinute - 60, calendarTimelineStartMinute + minuteOffset)
           );
           const lunchTime = `${String(Math.floor(lunchMinute / 60)).padStart(2, "0")}:${String(lunchMinute % 60).padStart(2, "0")}`;
           localStorage.setItem(
@@ -3215,7 +3216,7 @@
           if (!noteReminder) return;
           const reminderMinute = Math.max(
             7 * 60 + 35,
-            Math.min(15 * 60 + 29, calendarDisplayStartMinute + minuteOffset)
+            Math.min(15 * 60 + 29, calendarTimelineStartMinute + minuteOffset)
           );
           date.setHours(Math.floor(reminderMinute / 60), reminderMinute % 60, 0, 0);
           const error = saveNoteReminder(
@@ -3237,7 +3238,7 @@
         const ticket = tickets[ticketIndex];
         const reminderMinute = Math.max(
           7 * 60 + 35,
-          Math.min(15 * 60 + 29, calendarDisplayStartMinute + minuteOffset)
+          Math.min(15 * 60 + 29, calendarTimelineStartMinute + minuteOffset)
         );
         date.setHours(Math.floor(reminderMinute / 60), reminderMinute % 60, 0, 0);
 
@@ -3270,7 +3271,7 @@
 
       function layoutCalendarEvents(events) {
         const intervals = events.map((event) => {
-          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - calendarDisplayStartMinute;
+          const startMinute = event.date.getHours() * 60 + event.date.getMinutes() - calendarTimelineStartMinute;
           const durationMinutes =
             event.type === "closed"
               ? 1
@@ -3369,9 +3370,9 @@
         const weekdays = calendarWeekdays
           .map((weekday) => `<div class="calendar-weekday" role="columnheader">${weekday}</div>`)
           .join("");
-        const halfHourSlots = (calendarDisplayEndMinute - calendarDisplayStartMinute) / 30;
+        const halfHourSlots = (calendarDisplayEndMinute - calendarTimelineStartMinute) / 30;
         const timeScale = Array.from({ length: halfHourSlots + 1 }, (_, halfHour) => {
-          const totalMinutes = calendarDisplayStartMinute + halfHour * 30;
+          const totalMinutes = calendarTimelineStartMinute + halfHour * 30;
           const hour = Math.floor(totalMinutes / 60);
           const minute = totalMinutes % 60;
           const label = `${hour % 12 || 12}${minute ? ":30" : ""} ${hour < 12 ? "AM" : "PM"}`;
@@ -3385,7 +3386,7 @@
           const closedEvents = dayEvents.filter((event) => event.type === "closed");
           const closedBeforeHoursEvents = closedEvents.filter((event) => {
             const minuteOfDay = event.date.getHours() * 60 + event.date.getMinutes();
-            return minuteOfDay < calendarDisplayStartMinute;
+            return minuteOfDay < calendarTimelineStartMinute;
           });
           const closedAfterHoursEvents = closedEvents.filter((event) => {
             const minuteOfDay = event.date.getHours() * 60 + event.date.getMinutes();
@@ -3425,7 +3426,9 @@
             </div>
           `;
         }).join("");
-        const grid = `<div class="calendar-grid-container"><div class="calendar-grid" role="grid">
+        const timelineHeight =
+          (calendarDisplayEndMinute - calendarTimelineStartMinute) * calendarPixelsPerMinute;
+        const grid = `<div class="calendar-grid-container"><div class="calendar-grid" role="grid" style="--calendar-timeline-height: ${timelineHeight}px;">
           <div class="calendar-week" role="row"><div class="calendar-weekday" role="columnheader" aria-label="Time"></div>${weekdays}</div>
           <div class="calendar-week" role="row">
             <div class="calendar-day calendar-time-rail" role="presentation">
@@ -3478,13 +3481,13 @@
       function updateCalendarCurrentTime() {
         const now = new Date();
         const minuteOfDay = now.getHours() * 60 + now.getMinutes();
-        const isVisible = minuteOfDay >= calendarDisplayStartMinute &&
+        const isVisible = minuteOfDay >= calendarTimelineStartMinute &&
           minuteOfDay <= calendarDisplayEndMinute;
         document.querySelectorAll("[data-calendar-now]").forEach((indicator) => {
           indicator.hidden = !isVisible;
           if (!isVisible) return;
           indicator.style.top =
-            `${(minuteOfDay - calendarDisplayStartMinute) * calendarPixelsPerMinute}px`;
+            `${(minuteOfDay - calendarTimelineStartMinute) * calendarPixelsPerMinute}px`;
           indicator.querySelector("span").textContent =
             now.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
         });
@@ -3492,7 +3495,7 @@
 
       function isWithinCalendarDisplayHours(date) {
         const minuteOfDay = date.getHours() * 60 + date.getMinutes();
-        return minuteOfDay >= calendarDisplayStartMinute && minuteOfDay < calendarDisplayEndMinute;
+        return minuteOfDay >= calendarTimelineStartMinute && minuteOfDay < calendarDisplayEndMinute;
       }
 
       function renderUnscheduledTickets() {

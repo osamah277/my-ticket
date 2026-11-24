@@ -79,6 +79,13 @@
         background: #e8f2ff;
       }
 
+      .settings-hint {
+        display: block;
+        padding: 0 8px 8px;
+        color: #667085;
+        font-size: 0.75rem;
+      }
+
       .settings-danger-zone {
         margin-top: 8px;
         padding: 8px;
@@ -155,6 +162,10 @@
 
       .dark-mode .settings-panel button {
         color: #e5e7eb;
+      }
+
+      .dark-mode .settings-hint {
+        color: #aab4c2;
       }
 
       .dark-mode .delete-confirm-dialog {
@@ -1383,6 +1394,10 @@
             <button type="button" data-profile="steven" aria-pressed="true" onclick="setProfile('steven')">
               Steven Settings (Default)
             </button>
+            <button type="button" title="Choose Save as PDF in the print dialog" onclick="generateWeeklyReport()">
+              Generate weekly PDF report (last 7 days)
+            </button>
+            <small class="settings-hint">Choose “Save as PDF” in the print dialog.</small>
             <section class="settings-danger-zone" aria-label="Ticket deletion">
               <label for="delete-ticket-number">Ticket number to delete</label>
               <input id="delete-ticket-number" type="text" placeholder="Enter ticket number">
@@ -2265,6 +2280,114 @@
         const isOpen = panel.hidden;
         panel.hidden = !isOpen;
         document.querySelector(".settings-button").setAttribute("aria-expanded", String(isOpen));
+      }
+
+      function generateWeeklyReport() {
+        const end = new Date();
+        const start = new Date(end.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const isWithinReportPeriod = (value) => {
+          const timestamp = Date.parse(value);
+          return Number.isFinite(timestamp) && timestamp >= start.getTime() && timestamp <= end.getTime();
+        };
+        const recentlyUpdatedTickets = tickets
+          .filter((ticket) => isWithinReportPeriod(ticket.lastUpdateAt))
+          .sort((left, right) => Date.parse(right.lastUpdateAt) - Date.parse(left.lastUpdateAt));
+        const summaryItems = [
+          [
+            "Tickets created",
+            tickets.filter((ticket) => isWithinReportPeriod(ticket.createdAt)).length,
+          ],
+          ["Tickets updated", recentlyUpdatedTickets.length],
+          [
+            "Tickets resolved",
+            tickets.filter((ticket) => isWithinReportPeriod(ticket.resolvedAt)).length,
+          ],
+          [
+            "Tickets closed",
+            tickets.filter((ticket) => isWithinReportPeriod(ticket.closedAt)).length,
+          ],
+          [
+            "Currently active tickets",
+            tickets.filter((ticket) => !isClosedCategoryStatus(ticket.status)).length,
+          ],
+        ];
+        const reportWindow = window.open("", "_blank");
+        if (!reportWindow) {
+          pop("Allow pop-ups to generate the PDF report");
+          return;
+        }
+
+        const reportTitle = `Weekly Ticket Report ${localDateKey(start)} to ${localDateKey(end)}`;
+        const ticketRows = recentlyUpdatedTickets.map((ticket) => `
+          <tr>
+            <td>${escapeHtml(String(ticket.ticketNumber || ""))}</td>
+            <td>${escapeHtml(String(ticket.customerName || ""))}</td>
+            <td>${escapeHtml(String(ticket.status || ""))}</td>
+            <td>${escapeHtml(String(ticket.priority || ""))}</td>
+            <td>${escapeHtml(formatDate(ticket.createdAt))}</td>
+            <td>${escapeHtml(formatDate(ticket.lastUpdateAt))}</td>
+            <td>${escapeHtml(formatDate(ticket.resolvedAt))}</td>
+            <td>${escapeHtml(formatDate(ticket.closedAt))}</td>
+            <td>${escapeHtml(String(ticket.shortDescription || ""))}</td>
+          </tr>
+        `).join("");
+        const reportHtml = `<!doctype html>
+          <html lang="en">
+            <head>
+              <meta charset="utf-8">
+              <meta name="viewport" content="width=device-width, initial-scale=1">
+              <title>${escapeHtml(reportTitle)}</title>
+              <style>
+                @page { size: landscape; margin: 12mm; }
+                body { color: #1f2937; font: 10pt Arial, sans-serif; }
+                h1 { margin: 0; font-size: 22pt; }
+                h2 { margin: 22px 0 8px; font-size: 14pt; }
+                .period, .generated { margin: 6px 0; color: #4b5563; }
+                .summary { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; margin-top: 20px; }
+                .metric { padding: 12px; border: 1px solid #d1d5db; border-radius: 6px; }
+                .metric span { display: block; color: #4b5563; font-size: 9pt; }
+                .metric strong { display: block; margin-top: 6px; font-size: 20pt; }
+                table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+                thead { display: table-header-group; }
+                tr { break-inside: avoid; }
+                th, td { padding: 6px; border: 1px solid #d1d5db; text-align: left; vertical-align: top; overflow-wrap: anywhere; }
+                th { background: #f3f4f6; }
+                @media screen {
+                  body { max-width: 1400px; margin: 32px auto; padding: 0 20px; }
+                }
+              </style>
+            </head>
+            <body>
+              <h1>Weekly Ticket Report</h1>
+              <p class="period">Period: ${escapeHtml(start.toLocaleString())} – ${escapeHtml(end.toLocaleString())}</p>
+              <p class="generated">Generated: ${escapeHtml(end.toLocaleString())}</p>
+              <section class="summary" aria-label="Weekly summary">
+                ${summaryItems.map(([label, value]) => `
+                  <article class="metric">
+                    <span>${escapeHtml(label)}</span>
+                    <strong>${value}</strong>
+                  </article>
+                `).join("")}
+              </section>
+              <h2>Tickets updated during this period (${recentlyUpdatedTickets.length})</h2>
+              ${recentlyUpdatedTickets.length
+                ? `<table>
+                    <thead>
+                      <tr>
+                        <th>Ticket</th><th>Customer</th><th>Status</th><th>Priority</th>
+                        <th>Created</th><th>Last updated</th><th>Resolved</th><th>Closed</th><th>Description</th>
+                      </tr>
+                    </thead>
+                    <tbody>${ticketRows}</tbody>
+                  </table>`
+                : "<p>No tickets were updated during this period.</p>"}
+            </body>
+          </html>`;
+        reportWindow.document.open();
+        reportWindow.document.write(reportHtml);
+        reportWindow.document.close();
+        reportWindow.focus();
+        reportWindow.print();
       }
 
       function toggleTheme() {

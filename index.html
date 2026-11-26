@@ -1440,7 +1440,8 @@
               <label for="emailjs-public-key">EmailJS public key</label>
               <input id="emailjs-public-key" type="text" autocomplete="off">
               <small class="settings-hint">
-                Set the EmailJS template recipient to {{to_email}} and use {{subject}} and {{message}} in its content.
+                In EmailJS, set the template's To Email field to {{to_email}} (not From Email).
+                Use {{subject}} for Subject and {{message}} for the body.
                 Use only an EmailJS public key here, never a private key.
                 Emails are sent when reminders are set and when they fire; keep this dashboard open at reminder time.
               </small>
@@ -2675,6 +2676,14 @@
           });
           if (!response.ok) {
             const details = (await response.text()).slice(0, 240);
+            if (
+              response.status === 422 &&
+              /recipient[s']? address is empty/i.test(details)
+            ) {
+              throw new Error(
+                "EmailJS has no recipient. In EmailJS > Email Templates, set the selected template's To Email field to {{to_email}} (not From Email), then save and try again."
+              );
+            }
             throw new Error(`EmailJS returned ${response.status}${details ? `: ${details}` : ""}`);
           }
           updateReminderEmailStatus(notification, `Email sent to ${emailSettings.recipient}.`);

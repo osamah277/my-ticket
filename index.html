@@ -56,42 +56,12 @@
         top: calc(100% + 6px);
         right: 0;
         z-index: 10;
-        width: min(360px, calc(100vw - 32px));
+        min-width: 190px;
         padding: 8px;
         border: 1px solid #d3dce6;
         border-radius: 8px;
         background: #fff;
         box-shadow: 0 4px 16px rgb(0 0 0 / 15%);
-      }
-
-      .settings-email {
-        padding: 8px;
-        border-top: 1px solid #d3dce6;
-      }
-
-      .settings-email h3 {
-        margin: 4px 0 8px;
-      }
-
-      .settings-email label {
-        display: block;
-        margin-top: 8px;
-        font-size: 0.85rem;
-      }
-
-      .settings-email input {
-        margin: 3px 0;
-      }
-
-      .settings-email-status,
-      .notif-email-status {
-        min-height: 1em;
-        color: #667085;
-        font-size: 0.8rem;
-      }
-
-      .dark-mode .settings-email {
-        border-color: #3a4351;
       }
 
       .settings-panel button {
@@ -1393,7 +1363,6 @@
       <section class="notif-dialog" role="dialog" aria-modal="true" aria-labelledby="notification-title" aria-describedby="notification-message">
         <h2 id="notification-title">Notification</h2>
         <p id="notification-message"></p>
-        <p class="notif-email-status" id="notification-email-status" role="status" aria-live="polite"></p>
         <button type="button" onclick="confirmNotification()">Okay</button>
       </section>
     </div>
@@ -1429,26 +1398,6 @@
               Generate weekly PDF report (last 7 days)
             </button>
             <small class="settings-hint">Choose “Save as PDF” in the print dialog.</small>
-            <section class="settings-email" aria-label="Email reminders">
-              <h3>Email reminders</h3>
-              <label for="reminder-email-recipient">Send reminder emails to</label>
-              <input id="reminder-email-recipient" type="email" autocomplete="email" placeholder="you@example.com">
-              <label for="emailjs-service-id">EmailJS service ID</label>
-              <input id="emailjs-service-id" type="text" autocomplete="off">
-              <label for="emailjs-template-id">EmailJS template ID</label>
-              <input id="emailjs-template-id" type="text" autocomplete="off">
-              <label for="emailjs-public-key">EmailJS public key</label>
-              <input id="emailjs-public-key" type="text" autocomplete="off">
-              <small class="settings-hint">
-                In EmailJS, set the template's To Email field to {{to_email}} (not From Email).
-                Use {{subject}} for Subject and {{message}} for the body.
-                Use only an EmailJS public key here, never a private key.
-                Emails are sent when reminders are set and when they fire; keep this dashboard open at reminder time.
-              </small>
-              <button type="button" onclick="saveEmailSettings()">Save email settings</button>
-              <button type="button" onclick="sendEmailTest()">Send test email</button>
-              <p class="settings-email-status" id="email-settings-status" role="status" aria-live="polite"></p>
-            </section>
             <section class="settings-danger-zone" aria-label="Ticket deletion">
               <label for="delete-ticket-number">Ticket number to delete</label>
               <input id="delete-ticket-number" type="text" placeholder="Enter ticket number">
@@ -1755,7 +1704,6 @@
     <script>
       localStorage.removeItem("ticket_dashboard_delete_password");
       const storageKey = "tickets_v4";
-      const emailSettingsStorageKey = "ticket_dashboard_email_settings";
       const noteReminderStorageKey = "ticket_dashboard_note_reminders";
       const calendarLocationStorageKey = "ticket_dashboard_calendar_locations";
       const profileStorageKey = "ticket_dashboard_profile";
@@ -1776,7 +1724,6 @@
       const ticketPageSize = 20;
       const minimumColumnWidth = 90;
       const defaultColumnWidths = [90, 110, 150, 140, 110, 120, 140, 320];
-      let emailSettings = JSON.parse(localStorage.getItem(emailSettingsStorageKey) || "{}");
       let calendarLocations = JSON.parse(localStorage.getItem(calendarLocationStorageKey) || "{}");
       let preferredColumnWidths = {};
       let activeProfile = localStorage.getItem(profileStorageKey) === "osamah" ? "osamah" : "steven";
@@ -2525,9 +2472,6 @@
 
       function pop(message, linkedTickets = [], type = "default", occurrenceDate = "") {
         const notification = { message, linkedTickets, type, occurrenceDate };
-        if (["ticket-reminder", "note-reminder", "hypred-reminder"].includes(type)) {
-          sendReminderEmail(notification);
-        }
         if (document.getElementById("n").style.display === "flex") {
           notificationQueue.push(notification);
           return;
@@ -2580,8 +2524,6 @@
           messageElement.textContent = notification.message;
         }
 
-        document.getElementById("notification-email-status").textContent =
-          notification.emailStatus || "";
         document.getElementById("app-content").inert = true;
         document.getElementById("n").style.display = "flex";
         const confirmButton = document.querySelector(".notif-dialog button");
@@ -2589,115 +2531,6 @@
           ? "Confirm completion"
           : "Okay";
         confirmButton.focus();
-      }
-
-      function initializeEmailSettings() {
-        document.getElementById("reminder-email-recipient").value = emailSettings.recipient || "";
-        document.getElementById("emailjs-service-id").value = emailSettings.serviceId || "";
-        document.getElementById("emailjs-template-id").value = emailSettings.templateId || "";
-        document.getElementById("emailjs-public-key").value = emailSettings.publicKey || "";
-        document.getElementById("email-settings-status").textContent =
-          hasEmailSettings()
-            ? "Email reminders are enabled."
-            : "Enter your recipient and EmailJS settings to enable reminder emails.";
-      }
-
-      function hasEmailSettings() {
-        return Boolean(
-          emailSettings.recipient &&
-          emailSettings.serviceId &&
-          emailSettings.templateId &&
-          emailSettings.publicKey
-        );
-      }
-
-      function saveEmailSettings() {
-        const recipientInput = document.getElementById("reminder-email-recipient");
-        const recipient = recipientInput.value.trim();
-        const serviceId = document.getElementById("emailjs-service-id").value.trim();
-        const templateId = document.getElementById("emailjs-template-id").value.trim();
-        const publicKey = document.getElementById("emailjs-public-key").value.trim();
-        const status = document.getElementById("email-settings-status");
-
-        if (!recipientInput.validity.valid || !recipient) {
-          status.textContent = "Enter a valid recipient email address.";
-          recipientInput.focus();
-          return;
-        }
-        if (!serviceId || !templateId || !publicKey) {
-          status.textContent = "Enter the EmailJS service ID, template ID, and public key.";
-          return;
-        }
-
-        emailSettings = { recipient, serviceId, templateId, publicKey };
-        localStorage.setItem(emailSettingsStorageKey, JSON.stringify(emailSettings));
-        status.textContent = "Email settings saved. Reminder emails are enabled.";
-      }
-
-      function updateReminderEmailStatus(notification, message) {
-        notification.emailStatus = message;
-        if (activeNotification === notification) {
-          document.getElementById("notification-email-status").textContent = message;
-        }
-        document.getElementById("email-settings-status").textContent = message;
-      }
-
-      async function sendReminderEmail(notification) {
-        if (!hasEmailSettings()) {
-          updateReminderEmailStatus(
-            notification,
-            "Email not sent: configure your recipient and EmailJS settings."
-          );
-          return;
-        }
-
-        const subject = notification.type === "test"
-          ? "Ticket Dashboard email test"
-          : `Ticket Dashboard: ${notification.message}`;
-        const message = notification.type === "test"
-          ? "This is a test email from Ticket Dashboard."
-          : notification.message;
-        updateReminderEmailStatus(notification, `Sending email to ${emailSettings.recipient}...`);
-
-        try {
-          const response = await fetch("https://api.emailjs.com/api/v1.0/email/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              service_id: emailSettings.serviceId,
-              template_id: emailSettings.templateId,
-              user_id: emailSettings.publicKey,
-              template_params: {
-                to_email: emailSettings.recipient,
-                subject,
-                message,
-              },
-            }),
-          });
-          if (!response.ok) {
-            const details = (await response.text()).slice(0, 240);
-            if (
-              response.status === 422 &&
-              /recipient[s']? address is empty/i.test(details)
-            ) {
-              throw new Error(
-                "EmailJS has no recipient. In EmailJS > Email Templates, set the selected template's To Email field to {{to_email}} (not From Email), then save and try again."
-              );
-            }
-            throw new Error(`EmailJS returned ${response.status}${details ? `: ${details}` : ""}`);
-          }
-          updateReminderEmailStatus(notification, `Email sent to ${emailSettings.recipient}.`);
-        } catch (error) {
-          const details = error instanceof Error ? error.message : String(error);
-          updateReminderEmailStatus(notification, `Email failed: ${details}`);
-          console.error("Could not send reminder email through EmailJS.", error);
-        }
-      }
-
-      function sendEmailTest() {
-        saveEmailSettings();
-        if (!hasEmailSettings()) return;
-        sendReminderEmail({ type: "test", message: "" });
       }
 
       function confirmNotification() {
@@ -3264,11 +3097,7 @@
         if (dueNoteReminders.length) {
           saveNoteReminders();
           render();
-          pop(
-            `Reminder: ${dueNoteReminders.map((reminder) => reminder.note).join("; ")}`,
-            [],
-            "note-reminder"
-          );
+          pop(`Reminder: ${dueNoteReminders.map((reminder) => reminder.note).join("; ")}`);
         }
       }
 
@@ -3525,7 +3354,6 @@
           }
           endCalendarReminderDrag();
           renderCalendar();
-          pop(`Note reminder moved: ${noteReminder.note}`, [], "note-reminder");
           return;
         }
 
@@ -3885,7 +3713,7 @@
           }
           closeReminderEditor();
           render();
-          pop("Note reminder saved.", [], "note-reminder");
+          pop("Note reminder saved.");
           return;
         }
         if (editingReminderIndex < 0) return;
@@ -4344,7 +4172,6 @@
         return localDate.toISOString().slice(0, 16);
       }
 
-      initializeEmailSettings();
       checkResolvedTickets();
       setInterval(checkResolvedTickets, 60 * 1000);
       checkTicketReminders();
